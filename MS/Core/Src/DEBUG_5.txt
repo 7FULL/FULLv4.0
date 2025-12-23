@@ -1,0 +1,390 @@
+SD Logger inicializado correctamente - Logs disponibles
+=== INICIO DE INICIALIZACIÓN DE SENSORES ===
+Inicializando LED WS2812B...
+LED WS2812B inicializado correctamente
+Inicializando Buzzer...
+Buzzer inicializado correctamente
+Inicializando acelerómetro KX134...
+KX134 acelerómetro inicializado correctamente
+Inicializando barómetro MS5611...
+MS5611 barómetro inicializado correctamente
+Inicializando GPS ZOE-M8Q...
+ZOE-M8Q GPS inicializado correctamente
+GPS: Esperando fix inicial...
+GPS: Sin fix después de 2 minutos, continuando sin GPS
+Inicializando SPI Flash W25Q128...
+SPI Flash W25Q128 inicializado correctamente
+
+=== RESUMEN DE INICIALIZACIÓN ===
+✓ TODOS LOS SENSORES CRÍTICOS INICIALIZADOS CORRECTAMENTE
+✓ Sistema listo para operación de vuelo
+
+ROCKET: Initialized at altitude: 622.00m
+
+=== SISTEMA DE RECUPERACIÓN AUTOMÁTICA ===
+=== VERIFICANDO DATOS PREVIOS EN FLASH ===
+Flash contiene datos pero no se encontraron puntos válidos
+=== ROCKET STATE MACHINE TEST INICIADO ===
+Estados: SLEEP->ARMED->BOOST->COAST->APOGEE->PARACHUTE->LANDED
+Colores LED: Morado=SLEEP, Amarillo=ARMED, Rojo=BOOST, Azul=COAST, Blanco=APOGEE, Cyan=PARACHUTE, Verde=LANDED
+ROCKET: SLEEP (1s) | Accel: 0.000,0.000,0.000 | Press: 940.72 | Alt: 622.00 | Data: 0 pts
+ROCKET: SLEEP (2s) | Accel: 0.000,0.000,0.000 | Press: 940.75 | Alt: 621.00 | Data: 0 pts
+ROCKET: SLEEP (3s) | Accel: 0.000,0.000,0.000 | Press: 940.73 | Alt: 622.00 | Data: 0 pts
+ROCKET: SLEEP (4s) | Accel: 0.000,0.000,0.000 | Press: 940.74 | Alt: 621.00 | Data: 0 pts
+ROCKET: SLEEP (6s) | Accel: 0.000,0.000,0.000 | Press: 940.75 | Alt: 621.00 | Data: 0 pts
+ROCKET: SLEEP (7s) | Accel: 0.000,0.000,0.000 | Press: 940.75 | Alt: 621.00 | Data: 0 pts
+ROCKET: SLEEP (8s) | Accel: 0.000,0.000,0.000 | Press: 940.75 | Alt: 621.00 | Data: 0 pts
+ROCKET: SLEEP (9s) | Accel: 0.000,0.000,0.000 | Press: 940.73 | Alt: 622.00 | Data: 0 pts
+STATE CHANGE: SLEEP -> ARMED
+ROCKET: ARMED (0s) | Accel: 0.000,0.000,0.000 | Press: 940.73 | Alt: 622.00 | Data: 0 pts
+ROCKET: ARMED (1s) | Accel: 0.000,0.000,0.000 | Press: 940.73 | Alt: 622.00 | Data: 0 pts
+ROCKET: ARMED (2s) | Accel: 0.000,0.000,0.000 | Press: 940.74 | Alt: 621.00 | Data: 0 pts
+ROCKET: ARMED (3s) | Accel: 0.000,0.000,0.000 | Press: 940.71 | Alt: 622.00 | Data: 0 pts
+ROCKET: ARMED (4s) | Accel: 0.000,0.000,0.000 | Press: 940.71 | Alt: 622.00 | Data: 0 pts
+SIMULATION: Starting launch sequence simulation
+SIMULATION: Boost phase - 5G acceleration
+LAUNCH DETECTED!
+STATE CHANGE: ARMED -> BOOST
+ROCKET: BOOST (0s) | Accel: 0.000,0.000,5.000 | Press: 940.73 | Alt: 622.00 | Data: 1 pts
+SIMULATION: Boost phase - 5G acceleration
+SIMULATION: Boost phase - 5G acceleration
+ROCKET: BOOST (2s) | Accel: 0.000,0.000,5.000 | Press: 940.70 | Alt: 622.00 | Data: 3 pts
+SIMULATION: Boost phase - 5G acceleration
+SIMULATION: Boost phase - 5G acceleration
+ROCKET: BOOST (3s) | Accel: 0.000,0.000,5.000 | Press: 940.71 | Alt: 622.00 | Data: 5 pts
+SIMULATION: Coast phase - gaining altitude
+STATE CHANGE: BOOST -> COAST
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+ROCKET: COAST (0s) | Accel: 0.000,0.000,1.000 | Press: 940.73 | Alt: 712.00 | Data: 14 pts
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+ROCKET: COAST (1s) | Accel: 0.000,0.000,1.000 | Press: 940.71 | Alt: 802.00 | Data: 23 pts
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+ROCKET: COAST (3s) | Accel: 0.000,0.000,1.000 | Press: 940.71 | Alt: 892.00 | Data: 32 pts
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+ROCKET: COAST (4s) | Accel: 0.000,0.000,1.000 | Press: 940.72 | Alt: 982.00 | Data: 41 pts
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Coast phase - gaining altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+STATE CHANGE: COAST -> APOGEE
+ROCKET: APOGEE (0s) | Accel: 0.000,0.000,1.000 | Press: 940.70 | Alt: 992.00 | Data: 45 pts
+SIMULATION: Descent phase - losing altitude
+STATE CHANGE: APOGEE -> PARACHUTE
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+ROCKET: PARACHUTE (0s) | Accel: 0.000,0.000,1.000 | Press: 940.72 | Alt: 947.00 | Data: 54 pts
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+ROCKET: PARACHUTE (1s) | Accel: 0.000,0.000,1.000 | Press: 940.69 | Alt: 902.00 | Data: 63 pts
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+ROCKET: PARACHUTE (2s) | Accel: 0.000,0.000,1.000 | Press: 940.69 | Alt: 857.00 | Data: 72 pts
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+ROCKET: PARACHUTE (4s) | Accel: 0.000,0.000,1.000 | Press: 940.69 | Alt: 812.00 | Data: 81 pts
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+ROCKET: PARACHUTE (5s) | Accel: 0.000,0.000,1.000 | Press: 940.72 | Alt: 767.00 | Data: 90 pts
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+SIMULATION: Descent phase - losing altitude
+ROCKET: PARACHUTE (6s) | Accel: 0.000,0.000,1.000 | Press: 940.70 | Alt: 722.00 | Data: 99 pts
+SIMULATION: Landing phase - near ground
+STATE CHANGE: PARACHUTE -> LANDED
+FLIGHT COMPLETE: Max altitude: 1002.00m, Data points: 99
+SIMULATION: Landing phase - near ground
+Starting data transfer from SPI Flash to SD card...
+Creating CSV file: flight_data_158675.csv
+Timestamp,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ,Pressure,Temperature,Altitude,Latitude,Longitude,GPS_Alt
+142782,0.000,0.000,5000.000,0.000,0.000,0.000,94073.73,2903.03,62200.00,0.000000,0.000000,0.00
+143505,0.000,0.000,5000.000,0.000,0.000,0.000,94071.71,2895.95,62200.00,0.000000,0.000000,0.00
+144241,0.000,0.000,5000.000,0.000,0.000,0.000,94070.70,2896.96,62200.00,0.000000,0.000000,0.00
+144981,0.000,0.000,5000.000,0.000,0.000,0.000,94072.72,2897.97,62200.00,0.000000,0.000000,0.00
+145697,0.000,0.000,5000.000,0.000,0.000,0.000,94071.71,2899.99,62200.00,0.000000,0.000000,0.00
+146453,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2901.01,63200.00,0.000000,0.000000,0.00
+146592,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2904.04,64200.00,0.000000,0.000000,0.00
+146705,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2906.06,65200.00,0.000000,0.000000,0.00
+146813,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2908.08,66200.00,0.000000,0.000000,0.00
+146921,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2909.09,67200.00,0.000000,0.000000,0.00
+147045,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2910.10,68200.00,0.000000,0.000000,0.00
+147153,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2911.11,69200.00,0.000000,0.000000,0.00
+147287,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2911.11,70200.00,0.000000,0.000000,0.00
+147397,0.000,0.000,1000.000,0.000,0.000,0.000,94073.73,2912.12,71200.00,0.000000,0.000000,0.00
+147508,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2912.12,72200.00,0.000000,0.000000,0.00
+147634,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2913.13,73200.00,0.000000,0.000000,0.00
+147742,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2913.13,74200.00,0.000000,0.000000,0.00
+147850,0.000,0.000,1000.000,0.000,0.000,0.000,94069.69,2914.14,75200.00,0.000000,0.000000,0.00
+147958,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2915.15,76200.00,0.000000,0.000000,0.00
+148066,0.000,0.000,1000.000,0.000,0.000,0.000,94074.74,2915.15,77200.00,0.000000,0.000000,0.00
+148190,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2915.15,78200.00,0.000000,0.000000,0.00
+148324,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2915.15,79200.00,0.000000,0.000000,0.00
+148434,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2916.16,80200.00,0.000000,0.000000,0.00
+148545,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2916.16,81200.00,0.000000,0.000000,0.00
+148653,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2917.17,82200.00,0.000000,0.000000,0.00
+148779,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2917.17,83200.00,0.000000,0.000000,0.00
+148887,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2917.17,84200.00,0.000000,0.000000,0.00
+148995,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2918.18,85200.00,0.000000,0.000000,0.00
+149103,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2919.19,86200.00,0.000000,0.000000,0.00
+149211,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2919.19,87200.00,0.000000,0.000000,0.00
+149359,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2918.18,88200.00,0.000000,0.000000,0.00
+149470,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2919.19,89200.00,0.000000,0.000000,0.00
+149581,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2919.19,90200.00,0.000000,0.000000,0.00
+149689,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2920.20,91200.00,0.000000,0.000000,0.00
+149799,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2921.21,92200.00,0.000000,0.000000,0.00
+149923,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2920.20,93200.00,0.000000,0.000000,0.00
+150031,0.000,0.000,1000.000,0.000,0.000,0.000,94069.69,2921.21,94200.00,0.000000,0.000000,0.00
+150139,0.000,0.000,1000.000,0.000,0.000,0.000,94073.73,2922.22,95200.00,0.000000,0.000000,0.00
+150273,0.000,0.000,1000.000,0.000,0.000,0.000,94073.73,2921.21,96200.00,0.000000,0.000000,0.00
+150384,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2921.21,97200.00,0.000000,0.000000,0.00
+150508,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2922.22,98200.00,0.000000,0.000000,0.00
+150619,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2922.22,99200.00,0.000000,0.000000,0.00
+150727,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2923.23,100200.00,0.000000,0.000000,0.00
+150835,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2923.23,99700.00,0.000000,0.000000,0.00
+150945,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2923.23,99200.00,0.000000,0.000000,0.00
+151679,0.000,0.000,1000.000,0.000,0.000,0.000,94069.69,2917.17,98700.00,0.000000,0.000000,0.00
+151817,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2919.19,98200.00,0.000000,0.000000,0.00
+151928,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2921.21,97700.00,0.000000,0.000000,0.00
+152036,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2923.23,97200.00,0.000000,0.000000,0.00
+152144,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2924.24,96700.00,0.000000,0.000000,0.00
+152294,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2924.24,96200.00,0.000000,0.000000,0.00
+152407,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2925.25,95700.00,0.000000,0.000000,0.00
+152515,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2926.26,95200.00,0.000000,0.000000,0.00
+152623,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2926.26,94700.00,0.000000,0.000000,0.00
+152734,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2927.27,94200.00,0.000000,0.000000,0.00
+152858,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2927.27,93700.00,0.000000,0.000000,0.00
+152966,0.000,0.000,1000.000,0.000,0.000,0.000,94073.73,2928.28,93200.00,0.000000,0.000000,0.00
+153074,0.000,0.000,1000.000,0.000,0.000,0.000,94073.73,2928.28,92700.00,0.000000,0.000000,0.00
+153182,0.000,0.000,1000.000,0.000,0.000,0.000,94069.69,2929.29,92200.00,0.000000,0.000000,0.00
+153315,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2928.28,91700.00,0.000000,0.000000,0.00
+153442,0.000,0.000,1000.000,0.000,0.000,0.000,94074.74,2928.28,91200.00,0.000000,0.000000,0.00
+153552,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2929.29,90700.00,0.000000,0.000000,0.00
+153660,0.000,0.000,1000.000,0.000,0.000,0.000,94069.69,2929.29,90200.00,0.000000,0.000000,0.00
+153771,0.000,0.000,1000.000,0.000,0.000,0.000,94073.73,2930.30,89700.00,0.000000,0.000000,0.00
+153879,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2930.30,89200.00,0.000000,0.000000,0.00
+153987,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2931.31,88700.00,0.000000,0.000000,0.00
+154095,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2931.31,88200.00,0.000000,0.000000,0.00
+154203,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2931.31,87700.00,0.000000,0.000000,0.00
+154336,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2931.31,87200.00,0.000000,0.000000,0.00
+154463,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2931.31,86700.00,0.000000,0.000000,0.00
+154573,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2932.32,86200.00,0.000000,0.000000,0.00
+154681,0.000,0.000,1000.000,0.000,0.000,0.000,94069.69,2932.32,85700.00,0.000000,0.000000,0.00
+154792,0.000,0.000,1000.000,0.000,0.000,0.000,94073.73,2933.33,85200.00,0.000000,0.000000,0.00
+154900,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2933.33,84700.00,0.000000,0.000000,0.00
+155024,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2933.33,84200.00,0.000000,0.000000,0.00
+155132,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2933.33,83700.00,0.000000,0.000000,0.00
+155266,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2933.33,83200.00,0.000000,0.000000,0.00
+155377,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2933.33,82700.00,0.000000,0.000000,0.00
+131145,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2934.34,82200.00,0.000000,0.000000,0.00
+155611,0.000,0.000,0.000,0.000,0.000,0.000,0.00,2934.34,81700.00,0.000000,0.000000,0.00
+155719,0.000,0.000,1000.000,0.000,0.000,0.000,94069.69,2934.34,81200.00,0.000000,0.000000,0.00
+155830,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2935.35,80700.00,0.000000,0.000000,0.00
+155938,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2935.35,80200.00,0.000000,0.000000,0.00
+156046,0.000,0.000,1000.000,0.000,0.000,0.000,94069.69,2935.35,79700.00,0.000000,0.000000,0.00
+156170,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2935.35,79200.00,0.000000,0.000000,0.00
+156304,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2935.35,78700.00,0.000000,0.000000,0.00
+156415,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2935.35,78200.00,0.000000,0.000000,0.00
+156523,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2936.36,77700.00,0.000000,0.000000,0.00
+156633,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2936.36,77200.00,0.000000,0.000000,0.00
+156757,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2936.36,76700.00,0.000000,0.000000,0.00
+156868,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2937.37,76200.00,0.000000,0.000000,0.00
+156976,0.000,0.000,1000.000,0.000,0.000,0.000,94068.68,2937.37,75700.00,0.000000,0.000000,0.00
+157084,0.000,0.000,1000.000,0.000,0.000,0.000,94072.72,2937.37,75200.00,0.000000,0.000000,0.00
+157192,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2938.38,74700.00,0.000000,0.000000,0.00
+157342,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2937.37,74200.00,0.000000,0.000000,0.00
+157453,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2937.37,73700.00,0.000000,0.000000,0.00
+157561,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2938.38,73200.00,0.000000,0.000000,0.00
+157669,0.000,0.000,1000.000,0.000,0.000,0.000,94071.71,2938.38,72700.00,0.000000,0.000000,0.00
+157779,0.000,0.000,1000.000,0.000,0.000,0.000,94070.70,2938.38,72200.00,0.000000,0.000000,0.00
+Data transfer completed: 99 data points saved to flight_data_158675.csv
+Borrando sector de datos del Flash...
+Flash borrado - 2 sectores limpiados
+Vuelo completado - Flash limpiado para próximo vuelo
+ROCKET: LANDED (1s) | Accel: 0.000,0.000,1.000 | Press: 940.71 | Alt: 624.00 | Data: 99 pts
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+ROCKET: LANDED (2s) | Accel: 0.000,0.000,1.000 | Press: 940.72 | Alt: 624.00 | Data: 99 pts
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+ROCKET: LANDED (3s) | Accel: 0.000,0.000,1.000 | Press: 940.71 | Alt: 624.00 | Data: 99 pts
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+ROCKET: LANDED (4s) | Accel: 0.000,0.000,1.000 | Press: 940.71 | Alt: 624.00 | Data: 99 pts
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+ROCKET: LANDED (5s) | Accel: 0.000,0.000,1.000 | Press: 940.71 | Alt: 624.00 | Data: 99 pts
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+ROCKET: LANDED (6s) | Accel: 0.000,0.000,1.000 | Press: 940.72 | Alt: 624.00 | Data: 99 pts
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+ROCKET: LANDED (7s) | Accel: 0.000,0.000,1.000 | Press: 940.70 | Alt: 624.00 | Data: 99 pts
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+ROCKET: LANDED (8s) | Accel: 0.000,0.000,1.000 | Press: 940.73 | Alt: 624.00 | Data: 99 pts
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+ROCKET: LANDED (9s) | Accel: 0.000,0.000,1.000 | Press: 940.71 | Alt: 624.00 | Data: 99 pts
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+ROCKET: LANDED (11s) | Accel: 0.000,0.000,1.000 | Press: 940.74 | Alt: 624.00 | Data: 99 pts
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+ROCKET: LANDED (12s) | Accel: 0.000,0.000,1.000 | Press: 940.71 | Alt: 624.00 | Data: 99 pts
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+ROCKET: LANDED (13s) | Accel: 0.000,0.000,1.000 | Press: 940.72 | Alt: 624.00 | Data: 99 pts
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
+SIMULATION: Landing phase - near ground
