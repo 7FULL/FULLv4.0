@@ -1,5 +1,5 @@
 #include "RocketStateMachine.h"
-#include "../Core/Inc/SDLogger.h"
+#include "SDLogger.h"
 #include <string.h>
 #include <stdio.h>
 
@@ -284,6 +284,14 @@ bool RocketStateMachine_ReadSensors(RocketStateMachine_t* rocket) {
     // Incluir el estado actual del cohete en los datos
     rocket->current_data.rocket_state = rocket->current_state;
 
+    // Capturar el estado de los canales pirotécnicos (bit 0-3 para canales 0-3)
+    rocket->current_data.pyro_channel_states = 0;
+    for (uint8_t ch = 0; ch < 4; ch++) {
+        if (PyroChannels_IsChannelActive(ch)) {
+            rocket->current_data.pyro_channel_states |= (1 << ch);
+        }
+    }
+
     return true;
 }
 
@@ -416,7 +424,7 @@ bool RocketStateMachine_TransferDataToSD(RocketStateMachine_t* rocket) {
     UINT bytes_written;
 
     // Escribir header
-    char header[] = "Timestamp,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ,Pressure,Temperature,Altitude,Latitude,Longitude,GPS_Alt,State\r\n";
+    char header[] = "Timestamp,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ,Pressure,Temperature,Altitude,Latitude,Longitude,GPS_Alt,State,Pyro0,Pyro1,Pyro2,Pyro3\r\n";
     result = f_write(&csv_file, header, strlen(header), &bytes_written);
     if (result != FR_OK) {
         f_close(&csv_file);
@@ -432,8 +440,14 @@ bool RocketStateMachine_TransferDataToSD(RocketStateMachine_t* rocket) {
         if (SPIFlash_ReadData(rocket->spi_flash, read_address, data_buffer, sizeof(FlightData_t))) {
             memcpy(&flight_data, data_buffer, sizeof(FlightData_t));
 
+            // Extraer estados de los canales pirotécnicos (bit 0-3)
+            uint8_t pyro0 = (flight_data.pyro_channel_states & 0x01) ? 1 : 0;
+            uint8_t pyro1 = (flight_data.pyro_channel_states & 0x02) ? 1 : 0;
+            uint8_t pyro2 = (flight_data.pyro_channel_states & 0x04) ? 1 : 0;
+            uint8_t pyro3 = (flight_data.pyro_channel_states & 0x08) ? 1 : 0;
+
             char csv_line[300];
-            sprintf(csv_line, "%ld,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%02d,%ld.%02d,%ld.%02d,%ld.%06d,%ld.%06d,%ld.%02d,%s\r\n",
+            sprintf(csv_line, "%ld,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%02d,%ld.%02d,%ld.%02d,%ld.%06d,%ld.%06d,%ld.%02d,%s,%d,%d,%d,%d\r\n",
                    flight_data.timestamp,
                    (int32_t)(flight_data.acceleration_x * 1000), abs((int32_t)(flight_data.acceleration_x * 1000) % 1000),
                    (int32_t)(flight_data.acceleration_y * 1000), abs((int32_t)(flight_data.acceleration_y * 1000) % 1000),
@@ -447,7 +461,8 @@ bool RocketStateMachine_TransferDataToSD(RocketStateMachine_t* rocket) {
                    (int32_t)(flight_data.latitude * 1000000), abs((int32_t)(flight_data.latitude * 1000000) % 1000000),
                    (int32_t)(flight_data.longitude * 1000000), abs((int32_t)(flight_data.longitude * 1000000) % 1000000),
                    (int32_t)(flight_data.gps_altitude * 100), abs((int32_t)(flight_data.gps_altitude * 100) % 100),
-                   state_names[flight_data.rocket_state]);
+                   state_names[flight_data.rocket_state],
+                   pyro0, pyro1, pyro2, pyro3);
 
             // Escribir línea directamente al archivo
             result = f_write(&csv_file, csv_line, strlen(csv_line), &bytes_written);
@@ -534,14 +549,14 @@ bool RocketStateMachine_CheckAndRecoverFlashData_EarlyInit(SPIFlash_t* spiflash)
     if (sdlogger.is_mounted) {
         char filename[80];
 
-        // Verificar si la carpeta flights/ existe
+        // Verificar si la carpeta recovery_data/ existe
         FILINFO fno;
-        FRESULT dir_check = f_stat("flights", &fno);
+        FRESULT dir_check = f_stat("recovery_data", &fno);
 
         int recovery_number;
         if (dir_check == FR_OK && (fno.fattrib & AM_DIR)) {
-            // La carpeta flights/ existe, usarla
-            recovery_number = SDLogger_GetNextFlightFileName(filename, sizeof(filename), "recovered_data", "flights");
+            // La carpeta recovery_data/ existe, usarla
+            recovery_number = SDLogger_GetNextFlightFileName(filename, sizeof(filename), "recovered_data", "recovery_data");
         } else {
             // La carpeta no existe, guardar en raíz
             recovery_number = SDLogger_GetNextFlightFileName(filename, sizeof(filename), "recovered_data", "");
@@ -552,7 +567,7 @@ bool RocketStateMachine_CheckAndRecoverFlashData_EarlyInit(SPIFlash_t* spiflash)
             return false;
         }
 
-        char header[] = "Timestamp,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ,Pressure,Temperature,Altitude,Latitude,Longitude,GPS_Alt";
+        char header[] = "Timestamp,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ,Pressure,Temperature,Altitude,Latitude,Longitude,GPS_Alt,Pyro0,Pyro1,Pyro2,Pyro3";
 
         char csv_data[20000];
         csv_data[0] = '\0';
@@ -562,15 +577,22 @@ bool RocketStateMachine_CheckAndRecoverFlashData_EarlyInit(SPIFlash_t* spiflash)
             if (SPIFlash_ReadData(spiflash, read_address, data_buffer, sizeof(FlightData_t))) {
                 memcpy(&flight_data, data_buffer, sizeof(FlightData_t));
 
+                // Extraer estados de los canales pirotécnicos (bit 0-3)
+                uint8_t pyro0 = (flight_data.pyro_channel_states & 0x01) ? 1 : 0;
+                uint8_t pyro1 = (flight_data.pyro_channel_states & 0x02) ? 1 : 0;
+                uint8_t pyro2 = (flight_data.pyro_channel_states & 0x04) ? 1 : 0;
+                uint8_t pyro3 = (flight_data.pyro_channel_states & 0x08) ? 1 : 0;
+
                 char csv_line[300];
-                sprintf(csv_line, "%ld,%ld.%03d,%ld.%03d,%ld.%03d,0.000,0.000,0.000,%ld.%02d,%ld.%02d,%ld.%02d,0.000000,0.000000,0.00\r\n",
+                sprintf(csv_line, "%ld,%ld.%03d,%ld.%03d,%ld.%03d,0.000,0.000,0.000,%ld.%02d,%ld.%02d,%ld.%02d,0.000000,0.000000,0.00,%d,%d,%d,%d\r\n",
                        flight_data.timestamp,
                        (int32_t)(flight_data.acceleration_x * 1000), abs((int32_t)(flight_data.acceleration_x * 1000) % 1000),
                        (int32_t)(flight_data.acceleration_y * 1000), abs((int32_t)(flight_data.acceleration_y * 1000) % 1000),
                        (int32_t)(flight_data.acceleration_z * 1000), abs((int32_t)(flight_data.acceleration_z * 1000) % 1000),
                        (int32_t)(flight_data.pressure * 100), abs((int32_t)(flight_data.pressure * 100) % 100),
                        (int32_t)(flight_data.temperature * 100), abs((int32_t)(flight_data.temperature * 100) % 100),
-                       (int32_t)(flight_data.altitude * 100), abs((int32_t)(flight_data.altitude * 100) % 100));
+                       (int32_t)(flight_data.altitude * 100), abs((int32_t)(flight_data.altitude * 100) % 100),
+                       pyro0, pyro1, pyro2, pyro3);
 
                 strcat(csv_data, csv_line);
                 read_address += sizeof(FlightData_t);

@@ -1,0 +1,132 @@
+################################################################################
+# ROCKET FLIGHT COMPUTER - CONFIGURATION FILE
+################################################################################
+#
+# This file configures the behavior of the MASTER MCU hardware test and
+# flight software. Copy this file to your SD card as "rocket_config.txt"
+#
+# Format: PARAMETER_NAME=value
+# Lines starting with # are comments and will be ignored
+#
+################################################################################
+
+#==============================================================================
+# ACCELEROMETER CONFIGURATION (KX134-1211)
+#==============================================================================
+
+# ACCELEROMETER_RANGE
+# Configures the measurement range of the high-G accelerometer
+#
+# Valid values:
+#   0 = ±8g   - Ground testing, orientation detection, low G maneuvers
+#   1 = ±16g  - Small rockets, low-power motors
+#   2 = ±32g  - RECOMMENDED for most experimental rockets
+#   3 = ±64g  - High-power rockets, extreme acceleration events
+#
+# Trade-off: Higher range = lower resolution
+#   ±8g:  0.000244g per bit (most precise)
+#   ±16g: 0.000488g per bit
+#   ±32g: 0.000977g per bit (good balance)
+#   ±64g: 0.001953g per bit (least precise)
+#
+# IMPORTANT for flight:
+#   - Use 0 (±8g) for GROUND TESTING to verify 1.0G gravity reading
+#   - Use 2 (±32g) or 3 (±64g) for ACTUAL FLIGHTS to avoid saturation
+#
+# Example scenarios:
+#   - Testing on bench: 0 (±8g)
+#   - Small Estes rocket: 1 (±16g)
+#   - Mid-power rocket (E-G motors): 2 (±32g)
+#   - High-power rocket (H+ motors): 3 (±64g)
+
+ACCELEROMETER_RANGE=0
+
+#==============================================================================
+# GPS CONFIGURATION (ZOE-M8Q)
+#==============================================================================
+
+# GPS_TIMEOUT_SECONDS
+# Maximum time to wait for GPS fix during hardware test
+#
+# Valid range: 1 to 600 seconds (1 second to 10 minutes)
+#
+# Typical GPS acquisition times:
+#   - Cold start (no almanac): 26-30 seconds
+#   - Warm start (almanac available): 25-28 seconds
+#   - Hot start (ephemeris available): 1 second
+#   - Indoor/obstructed view: May never acquire fix
+#
+# Recommendations:
+#   - Ground testing: 300 (5 minutes) - gives GPS time to acquire
+#   - Quick testing: 60 (1 minute) - fast iteration
+#   - Skip GPS test: 1 (1 second) - when GPS is not needed
+#
+# NOTE: GPS needs clear view of the sky. Indoor testing may fail.
+
+GPS_TIMEOUT_SECONDS=300
+
+#==============================================================================
+# NOTES FOR FLIGHT SOFTWARE (Future Parameters)
+#==============================================================================
+#
+# The following parameters are used by the flight software state machine
+# (not currently active in hardware test mode, but documented for reference)
+#
+# LAUNCH_DETECTION_THRESHOLD
+#   - Acceleration threshold to detect liftoff (in G)
+#   - Typical: 2.5 to 5.0 G
+#   - Must be higher than vibration noise
+#
+# COAST_DETECTION_THRESHOLD
+#   - Acceleration threshold to detect motor burnout (in G)
+#   - Typical: 1.0 to 1.5 G (near gravity)
+#   - Transition from BOOST to COAST state
+#
+# APOGEE_DESCENT_TIME_MS
+#   - Time descending before confirming apogee (milliseconds)
+#   - Prevents false apogee detection from wind gusts
+#   - Typical: 3000 to 5000 ms
+#
+# ALTITUDE_STABLE_THRESHOLD
+#   - Altitude variation threshold for landing detection (meters)
+#   - Typical: 2.0 to 5.0 m
+#
+# STABLE_TIME_LANDING_MS
+#   - Time with stable altitude to confirm landing (milliseconds)
+#   - Typical: 5000 to 10000 ms
+#
+# DATA_LOGGING_FREQ_MS
+#   - Interval between data log entries (milliseconds)
+#   - Typical: 10 ms (100 Hz) for detailed flight data
+#   - Lower = more data, higher memory usage
+#
+# SIMULATION_MODE
+#   - Enable simulated launch sequence for testing
+#   - Values: true or false
+#   - WARNING: Never enable for actual flight!
+#
+################################################################################
+# END OF CONFIGURATION FILE
+################################################################################
+#
+# After editing this file:
+#   1. Save it as "rocket_config.txt" (without _EXAMPLE)
+#   2. Copy to the root directory of your SD card
+#   3. Insert SD card into flight computer
+#   4. Power on or reset the flight computer
+#   5. Configuration will be loaded automatically
+#   6. Check debug.txt on SD card to verify loaded values
+#
+# Configuration loading order:
+#   1. Hardware defaults (hardcoded in firmware)
+#   2. rocket_config.txt overrides (from SD card)
+#   3. If file missing or parameter invalid, default is used
+#
+# Troubleshooting:
+#   - If config not loading, check debug.txt for error messages
+#   - Ensure file is named exactly "rocket_config.txt"
+#   - Ensure SD card is FAT32 formatted
+#   - Check that parameters use exact names (case-sensitive)
+#   - Verify values are within valid ranges
+#
+################################################################################

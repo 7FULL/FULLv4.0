@@ -75,12 +75,16 @@ bool KX134_Configure(KX134_t* kx134, uint8_t range) {
     kx134->range = range;
 
     // Configurar CNTL1: Range y resolución
-    uint8_t cntl1_val = 0x00;
+    // CNTL1: PC1=0 (will be set in Enable), RES=1 (16-bit), DRDYE=0, GSEL[1:0]=range
+    // Bit 6 (RES) = 1 for high resolution (16-bit)
+    // Bits 4:3 (GSEL) = range selection
+    uint8_t cntl1_val = 0x40; // RES=1 (16-bit resolution)
+
     switch(range) {
-        case 0: cntl1_val = 0x08; break; // ±8g
-        case 1: cntl1_val = 0x10; break; // ±16g
-        case 2: cntl1_val = 0x18; break; // ±32g
-        case 3: cntl1_val = 0x20; break; // ±64g
+        case 0: cntl1_val |= 0x00; break; // ±8g  (GSEL=00)
+        case 1: cntl1_val |= 0x08; break; // ±16g (GSEL=01)
+        case 2: cntl1_val |= 0x10; break; // ±32g (GSEL=10)
+        case 3: cntl1_val |= 0x18; break; // ±64g (GSEL=11)
     }
     KX134_WriteRegister(kx134, KX134_CNTL1, cntl1_val);
 

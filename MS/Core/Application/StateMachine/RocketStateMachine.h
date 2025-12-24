@@ -46,6 +46,7 @@ typedef struct {
     float gps_altitude;
     uint32_t timestamp;
     RocketState_t rocket_state;
+    uint8_t pyro_channel_states;  // Bit field: bit 0-3 for channels 0-3 (0=inactive, 1=active)
 } FlightData_t;
 
 typedef struct {

@@ -13,6 +13,10 @@ set(CMAKE_OBJDUMP arm-none-eabi-objdump)
 set(SIZE arm-none-eabi-size)
 set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 
+# Find full paths to tools (needed for POST_BUILD commands on Windows)
+find_program(CMAKE_OBJCOPY_FULL arm-none-eabi-objcopy REQUIRED)
+find_program(CMAKE_SIZE_FULL arm-none-eabi-size REQUIRED)
+
 # project settings
 project(MS C CXX ASM)
 set(CMAKE_CXX_STANDARD 17)
@@ -49,11 +53,29 @@ else ()
     add_compile_options(-Og -g)
 endif ()
 
-include_directories(Core/Inc Drivers/STM32F4xx_HAL_Driver/Inc Drivers/STM32F4xx_HAL_Driver/Inc/Legacy Drivers/CMSIS/Device/ST/STM32F4xx/Include Drivers/CMSIS/Include FATFS/Target FATFS/App Middlewares/Third_Party/FatFs/src)
+include_directories(
+    Core/Inc
+    Core/Drivers/Sensors
+    Core/Drivers/Actuators
+    Core/Drivers/Storage
+    Core/Drivers/Storage/FATFS_SD
+    Core/Application/StateMachine
+    Core/Application/Testing
+    Drivers/STM32F4xx_HAL_Driver/Inc
+    Drivers/STM32F4xx_HAL_Driver/Inc/Legacy
+    Drivers/CMSIS/Device/ST/STM32F4xx/Include
+    Drivers/CMSIS/Include
+    FATFS/Target
+    FATFS/App
+    Middlewares/Third_Party/FatFs/src
+)
 
 add_definitions(-DDEBUG -DUSE_HAL_DRIVER -DSTM32F411xE)
 
-file(GLOB_RECURSE SOURCES "MIDWARE/*.*" "Core/*.*" "FATFS/*.*" "Middlewares/*.*" "Drivers/*.*")
+file(GLOB_RECURSE SOURCES "Core/*.*" "FATFS/*.*" "Middlewares/*.*" "Drivers/*.*")
+
+# Exclude state machine during hardware testing (uncomment to exclude)
+# list(FILTER SOURCES EXCLUDE REGEX ".*RocketStateMachine\\.(c|cpp)$")
 
 set(LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/STM32F411RETX_FLASH.ld)
 
@@ -67,7 +89,8 @@ set(HEX_FILE ${PROJECT_BINARY_DIR}/${PROJECT_NAME}.hex)
 set(BIN_FILE ${PROJECT_BINARY_DIR}/${PROJECT_NAME}.bin)
 
 add_custom_command(TARGET ${PROJECT_NAME}.elf POST_BUILD
-        COMMAND ${CMAKE_OBJCOPY} -Oihex $<TARGET_FILE:${PROJECT_NAME}.elf> ${HEX_FILE}
-        COMMAND ${CMAKE_OBJCOPY} -Obinary $<TARGET_FILE:${PROJECT_NAME}.elf> ${BIN_FILE}
+        COMMAND ${CMAKE_OBJCOPY_FULL} -Oihex $<TARGET_FILE:${PROJECT_NAME}.elf> ${HEX_FILE}
+        COMMAND ${CMAKE_OBJCOPY_FULL} -Obinary $<TARGET_FILE:${PROJECT_NAME}.elf> ${BIN_FILE}
+        COMMAND ${CMAKE_SIZE_FULL} ${PROJECT_NAME}.elf
         COMMENT "Building ${HEX_FILE}
 Building ${BIN_FILE}")
