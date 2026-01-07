@@ -7,7 +7,6 @@ bool Buzzer_Init(Buzzer_t *buzzer) {
     buzzer->gpio_pin = BUZZER_PIN;
     buzzer->is_initialized = true;
 
-    // Asegurar que el buzzer esté apagado al inicio
     Buzzer_Off(buzzer);
 
     return true;
@@ -60,7 +59,7 @@ void Buzzer_BeepMultiple(Buzzer_t *buzzer, uint8_t count, uint16_t on_time_ms, u
 
     for (uint8_t i = 0; i < count; i++) {
         Buzzer_Beep(buzzer, on_time_ms);
-        if (i < count - 1) { // No esperar después del último beep
+        if (i < count - 1) {
             HAL_Delay(off_time_ms);
         }
     }
@@ -71,39 +70,39 @@ void Buzzer_Pattern(Buzzer_t *buzzer, Buzzer_Pattern_t pattern) {
 
     switch (pattern) {
         case BUZZER_PATTERN_SUCCESS:
-            // 2 beeps cortos
+            // 2 short beeps
             Buzzer_BeepMultiple(buzzer, 2, 200, 200);
             break;
 
         case BUZZER_PATTERN_ERROR:
-            // 3 beeps rápidos
+            // 3 short beeps
             Buzzer_BeepMultiple(buzzer, 3, 100, 100);
             break;
 
         case BUZZER_PATTERN_WARNING:
-            // 1 beep largo
+            // 1 long beep
             Buzzer_BeepType(buzzer, BUZZER_BEEP_LONG);
             break;
 
         case BUZZER_PATTERN_INIT:
-            // 1 beep medio
+            // 1 medium beep
             Buzzer_BeepType(buzzer, BUZZER_BEEP_MEDIUM);
             break;
 
         case BUZZER_PATTERN_GPS_FIX:
-            // 1 beep largo + pausa + 2 beeps cortos
+            // 1 long beep + 2 short beeps
             Buzzer_BeepType(buzzer, BUZZER_BEEP_LONG);
             HAL_Delay(300);
             Buzzer_BeepMultiple(buzzer, 2, 150, 150);
             break;
 
         case BUZZER_PATTERN_DATA_SAVED:
-            // 2 beeps medios
+            // 2 medium beeps
             Buzzer_BeepMultiple(buzzer, 2, 300, 200);
             break;
 
         case BUZZER_PATTERN_STARTUP:
-            // Secuencia ascendente: corto -> medio -> largo
+            // Short, medium, long beeps
             Buzzer_BeepType(buzzer, BUZZER_BEEP_SHORT);
             HAL_Delay(200);
             Buzzer_BeepType(buzzer, BUZZER_BEEP_MEDIUM);

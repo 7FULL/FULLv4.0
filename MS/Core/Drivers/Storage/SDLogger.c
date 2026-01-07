@@ -47,7 +47,7 @@ bool SDLogger_Init(SDLogger_t* logger) {
     logger->is_file_open = false;
     memset(logger->filename, 0, sizeof(logger->filename));
 
-    // Montar la SD
+    // Mount SD card
     FRESULT result = f_mount(&logger->fatfs, "", 1);
     if (result != FR_OK) {
         return false;
@@ -60,12 +60,12 @@ bool SDLogger_Init(SDLogger_t* logger) {
 bool SDLogger_CreateDebugFile(SDLogger_t* logger) {
     if (!logger || !logger->is_mounted) return false;
 
-    // Obtener nombre de archivo único
+    // Get next available debug file name
     if (GetNextDebugFileName(logger->filename, sizeof(logger->filename)) < 0) {
         return false;
     }
 
-    // Crear el archivo
+    // Create and open the debug file
     FRESULT result = f_open(&logger->file, logger->filename, FA_CREATE_ALWAYS | FA_WRITE);
     if (result != FR_OK) {
         return false;
@@ -113,16 +113,33 @@ bool SDLogger_WriteText(SDLogger_t* logger, const char* text) {
 
     UINT bytes_written;
 
-    // Escribir el texto
+    // Write text
     FRESULT result = f_write(&logger->file, text, strlen(text), &bytes_written);
-    if (result != FR_OK) return false;
+    if (result != FR_OK) {
+        // SD card write failed - possibly disconnected
+        logger->is_mounted = false;
+        logger->is_file_open = false;
+        return false;
+    }
 
-    // Escribir salto de línea
+    // Write newline
     result = f_write(&logger->file, "\r\n", 2, &bytes_written);
-    if (result != FR_OK) return false;
+    if (result != FR_OK) {
+        // SD card write failed - possibly disconnected
+        logger->is_mounted = false;
+        logger->is_file_open = false;
+        return false;
+    }
 
-    // Sincronizar con disco
-    f_sync(&logger->file);
+    // Sync to ensure data is written
+    result = f_sync(&logger->file);
+    if (result != FR_OK) {
+        // SD card sync failed - possibly disconnected
+        logger->is_mounted = false;
+        logger->is_file_open = false;
+        return false;
+    }
+
     return true;
 }
 
@@ -137,28 +154,28 @@ bool SDLogger_WriteCSVFile(SDLogger_t* logger, const char* filename, const char*
 
     UINT bytes_written;
 
-    // Escribir header
+    // Write header
     result = f_write(&csv_file, header, strlen(header), &bytes_written);
     if (result != FR_OK) {
         f_close(&csv_file);
         return false;
     }
 
-    // Escribir salto de línea después del header
+    // Write newline after header
     result = f_write(&csv_file, "\r\n", 2, &bytes_written);
     if (result != FR_OK) {
         f_close(&csv_file);
         return false;
     }
 
-    // Escribir datos
+    // Write data
     result = f_write(&csv_file, data, strlen(data), &bytes_written);
     if (result != FR_OK) {
         f_close(&csv_file);
         return false;
     }
 
-    // Cerrar archivo
+    // Close file
     f_close(&csv_file);
     return true;
 }
@@ -183,10 +200,10 @@ bool SDLogger_Close(SDLogger_t* logger) {
 bool SDLogger_Deinit(SDLogger_t* logger) {
     if (!logger) return false;
 
-    // Cerrar archivo si está abierto
+    // Close file if open
     SDLogger_Close(logger);
 
-    // Desmontar SD
+    // Demount SD card
     if (logger->is_mounted) {
         f_mount(NULL, "", 0);
         logger->is_mounted = false;

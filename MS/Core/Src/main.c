@@ -26,7 +26,7 @@
 #include "PyroChannels.h"
 #include "ServoControl.h"
 #include "SDLogger.h"
-#include "HardwareTest.h"
+#include "RocketStateMachine.h"
 #include <stdio.h>
 
 /* Private typedef -----------------------------------------------------------*/
@@ -44,8 +44,8 @@ SPIFlash_t spiflash;
 ServoControl_t servo;
 SDLogger_t sdlogger;
 
-// Hardware test instance
-HardwareTest_t hwtest;
+// Rocket state machine instance
+RocketStateMachine_t rocket;
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -76,31 +76,69 @@ int main(void)
 
     /* USER CODE BEGIN 2 */
 
-    // Delay inicial para estabilización del hardware
+    // Initial delay for stability
     HAL_Delay(2000);
 
-    // Initialize hardware test structure
-    HardwareTest_Init(&hwtest);
+    // Initialize LED FIRST for error indication
+    WS2812B_Init(&led, &htim1, TIM_CHANNEL_2);
+    WS2812B_SetColorRGB(&led, 255, 255, 255); // White = initializing
 
-    // Assign hardware instance pointers
-    hwtest.hardware.kx134 = &kx134;
-    hwtest.hardware.ms5611 = &ms5611;
-    hwtest.hardware.gps = &gps;
-    hwtest.hardware.flash = &spiflash;
-    hwtest.hardware.led = &led;
-    hwtest.hardware.buzzer = &buzzer;
-    hwtest.hardware.sdlogger = &sdlogger;
-    hwtest.hardware.servo = &servo;
+    // Initialize Buzzer for audio feedback
+    Buzzer_Init(&buzzer);
+
+    // Initialize SD card logger
+    bool sd_ok = SDLogger_Init(&sdlogger);
+
+    if (!sd_ok) {
+        // SD initialization failed - LED red blink FAST
+        while (1) {
+            WS2812B_SetColorRGB(&led, 255, 0, 0);
+            HAL_Delay(100);
+            WS2812B_SetColorRGB(&led, 0, 0, 0);
+            HAL_Delay(100);
+        }
+    }
+
+    // Create debug log file
+    if (!SDLogger_CreateDebugFile(&sdlogger)) {
+        // Debug file creation failed - LED orange blink
+        while (1) {
+            WS2812B_SetColorRGB(&led, 255, 165, 0);
+            HAL_Delay(200);
+            WS2812B_SetColorRGB(&led, 0, 0, 0);
+            HAL_Delay(200);
+        }
+    }
+
+    // SD initialized successfully - LED green for 1 second
+    WS2812B_SetColorRGB(&led, 0, 255, 0);
+    HAL_Delay(1000);
+	WS2812B_SetColorRGB(&led, 0, 0, 0);
+
+    // Test write immediately
+    SDLogger_WriteText(&sdlogger, "=== SYSTEM BOOT ===");
+    SDLogger_WriteText(&sdlogger, "Master MCU Starting...");
+    SDLogger_WriteText(&sdlogger, "SD Card initialization: SUCCESS");
+
+    char test_msg[100];
+    sprintf(test_msg, "System time: %lu ms", HAL_GetTick());
+    SDLogger_WriteText(&sdlogger, test_msg);
 
     // Initialize pyro channels (safe by default)
     PyroChannels_Init();
+    SDLogger_WriteText(&sdlogger, "Pyro channels initialized (safe mode)");
 
-    // Run all hardware tests sequentially
-    HardwareTest_RunAll(&hwtest);
+    // Initialize rocket state machine with all hardware
+    if (!RocketStateMachine_Init(&rocket, &kx134, &ms5611, &gps, &led, &buzzer, &spiflash)) {
+        // Initialization failed - enter error loop with red LED
+        SDLogger_WriteText(&sdlogger, "ERROR: State machine initialization failed!");
+        WS2812B_SetColorRGB(&led, 255, 0, 0);
+        while (1) {
+            HAL_Delay(500);
+        }
+    }
 
-    // After tests complete, enter continuous monitoring mode
-    // This allows real-time verification of sensor readings
-    HardwareTest_ContinuousMonitoring(&hwtest);
+    SDLogger_WriteText(&sdlogger, "State machine initialized successfully");
 
     /* USER CODE END 2 */
 
@@ -108,7 +146,11 @@ int main(void)
     /* USER CODE BEGIN WHILE */
     while (1)
     {
-        // Infinite loop - continuous monitoring runs indefinitely
+        // Update rocket state machine
+        RocketStateMachine_Update(&rocket);
+
+        // Small delay to prevent excessive CPU usage (state machine handles timing internally)
+        HAL_Delay(1);
 
         /* USER CODE END WHILE */
         /* USER CODE BEGIN 3 */

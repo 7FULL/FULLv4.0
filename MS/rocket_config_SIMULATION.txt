@@ -1,0 +1,106 @@
+################################################################################
+# ROCKET FLIGHT COMPUTER - SIMULATION CONFIGURATION
+################################################################################
+#
+# This configuration enables SIMULATION MODE for desktop testing
+# Copy this to SD card as "rocket_config.txt" to run simulation
+#
+# ⚠️ WARNING: NEVER USE THIS CONFIG FOR ACTUAL FLIGHT! ⚠️
+#
+################################################################################
+
+#==============================================================================
+# SIMULATION MODE - ENABLED
+#==============================================================================
+
+SIMULATION_MODE=true
+
+#==============================================================================
+# HARDWARE TEST SETTINGS
+#==============================================================================
+
+ACCELEROMETER_RANGE=2
+GPS_TIMEOUT_SECONDS=5
+
+#==============================================================================
+# FLIGHT PARAMETERS (Used by simulation)
+#==============================================================================
+
+LAUNCH_DETECTION_THRESHOLD=2.5
+COAST_DETECTION_THRESHOLD=1.5
+BOOST_TIMEOUT_MS=10000
+COAST_TIMEOUT_MS=5000
+APOGEE_VELOCITY_THRESHOLD=2.0
+APOGEE_ALTITUDE_DROP_THRESHOLD=5.0
+
+ALTITUDE_STABLE_THRESHOLD=2.0
+STABLE_TIME_LANDING_MS=8000
+
+#==============================================================================
+# ARMING (Bypassed in simulation)
+#==============================================================================
+
+SLEEP_TIMEOUT_MS=5000
+ARMING_STABLE_TIME_MS=1000
+ARMING_ALTITUDE_MAX_DELTA=20.0
+REQUIRE_GPS_LOCK=false
+
+#==============================================================================
+# SENSOR SAFETY (All sensors valid in simulation)
+#==============================================================================
+
+SENSOR_TIMEOUT_MS=5000
+
+#==============================================================================
+# PYROTECHNIC CHANNELS
+#==============================================================================
+
+PYRO_ENABLE=true
+
+PYRO_DROGUE_CHANNEL=0
+PYRO_MAIN_CHANNEL=1
+PYRO_SEPARATION_CHANNEL=2
+PYRO_BACKUP_CHANNEL=3
+
+PYRO_DROGUE_DURATION_MS=3000
+PYRO_MAIN_DURATION_MS=3000
+
+MAIN_DEPLOY_ALTITUDE_AGL=300
+
+BACKUP_ACTIVATION_DELAY_MS=5000
+BACKUP_VELOCITY_THRESHOLD=-10.0
+
+#==============================================================================
+# DATA LOGGING
+#==============================================================================
+
+DATA_LOGGING_FREQ_MS=5
+
+################################################################################
+# SIMULATED FLIGHT PROFILE
+################################################################################
+#
+# Timeline:
+#   0-2s:   On pad (1G, ground level)
+#   2-5s:   Boost phase (4-8G, climbing to ~360m)
+#   5-10s:  Coast phase (decelerating, peak ~600m at t=8-9s)
+#   10-25s: Drogue descent (~8 m/s descent rate)
+#   25-40s: Main descent (~5 m/s descent rate)
+#   40s+:   Landed (1G, ground level)
+#
+# Expected State Transitions:
+#   t=0s:   SLEEP
+#   t=5s:   ARMED (after sleep timeout + arming checks)
+#   t=7s:   BOOST (launch detected at >2.5G)
+#   t=10s:  COAST (acceleration drops below 1.5G)
+#   t=15s:  APOGEE (velocity-based or time-based detection)
+#   t=15s:  PARACHUTE (drogue deployed immediately)
+#   t=30s:  Main deployed at 300m AGL
+#   t=48s:  LANDED (altitude stable for 8 seconds)
+#
+# You can watch the simulation progress in:
+#   - LED colors changing
+#   - Buzzer patterns
+#   - SD card logs (debug.txt, flight CSV)
+#
+################################################################################

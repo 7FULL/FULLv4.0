@@ -1,4 +1,5 @@
 #include "SPIFlash.h"
+#include <stdio.h>
 
 // Tabla de chips conocidos para identificación (optimizada para W25Q128JVS)
 static const struct {
@@ -26,7 +27,7 @@ void SPIFlash_ChipSelect(SPIFlash_t *flash, bool select) {
     if (!flash) return;
     HAL_GPIO_WritePin(SPIFLASH_CS_GPIO_PORT, SPIFLASH_CS_PIN,
                       select ? GPIO_PIN_RESET : GPIO_PIN_SET);
-    HAL_Delay(1); // Pequeña espera para estabilizar
+    // No delay needed - GPIO is fast enough
 }
 
 void SPIFlash_WriteProtect(SPIFlash_t *flash, bool protect) {
@@ -182,7 +183,7 @@ bool SPIFlash_WaitForReady(SPIFlash_t *flash, uint32_t timeout_ms) {
         if (SPIFlash_IsReady(flash)) {
             return true;
         }
-        HAL_Delay(1);
+        // No delay - poll as fast as possible for minimum latency
     }
     return false;
 }

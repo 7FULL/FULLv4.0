@@ -14,7 +14,7 @@ bool MS5611_Init(MS5611_t* ms5611, SPI_HandleTypeDef *hspi, GPIO_TypeDef *cs_por
     ms5611->cs_gpio_port = cs_port;
     ms5611->cs_pin = cs_pin;
     ms5611->is_initialized = false;
-    ms5611->osr = 4; // OSR=4096 por defecto (mejor resolución)
+    ms5611->osr = 2; // OSR=1024 (optimizado para velocidad - ~166Hz, ±0.23m precisión)
 
     // Configurar CS como HIGH (inactivo)
     HAL_GPIO_WritePin(ms5611->cs_gpio_port, ms5611->cs_pin, GPIO_PIN_SET);
@@ -52,12 +52,10 @@ void MS5611_SendCommand(MS5611_t* ms5611, uint8_t cmd) {
     if (!ms5611) return;
 
     HAL_GPIO_WritePin(ms5611->cs_gpio_port, ms5611->cs_pin, GPIO_PIN_RESET);
-    HAL_Delay(1);
 
     MS5611_SPI_ReadWrite(ms5611, cmd);
 
     HAL_GPIO_WritePin(ms5611->cs_gpio_port, ms5611->cs_pin, GPIO_PIN_SET);
-    HAL_Delay(1);
 }
 
 uint16_t MS5611_ReadPROMValue(MS5611_t* ms5611, uint8_t index) {
@@ -67,14 +65,12 @@ uint16_t MS5611_ReadPROMValue(MS5611_t* ms5611, uint8_t index) {
     uint8_t msb, lsb;
 
     HAL_GPIO_WritePin(ms5611->cs_gpio_port, ms5611->cs_pin, GPIO_PIN_RESET);
-    HAL_Delay(1);
 
     MS5611_SPI_ReadWrite(ms5611, cmd);
     msb = MS5611_SPI_ReadWrite(ms5611, 0x00);
     lsb = MS5611_SPI_ReadWrite(ms5611, 0x00);
 
     HAL_GPIO_WritePin(ms5611->cs_gpio_port, ms5611->cs_pin, GPIO_PIN_SET);
-    HAL_Delay(1);
 
     return ((uint16_t)msb << 8) | lsb;
 }
@@ -105,6 +101,17 @@ bool MS5611_IsValidPROM(MS5611_t* ms5611) {
     return true;
 }
 
+bool MS5611_IsReady(MS5611_t* ms5611) {
+    if (!ms5611) return false;
+
+    // Read ADC to check if conversion is complete
+    // If ADC returns 0, conversion is not ready
+    // Note: This is a simplified check. A more robust implementation
+    // would read a status register if available
+    uint32_t adc = MS5611_ReadADC(ms5611);
+    return (adc != 0);
+}
+
 bool MS5611_SetOSR(MS5611_t* ms5611, uint8_t osr) {
     if (!ms5611 || !ms5611->is_initialized) return false;
 
@@ -127,7 +134,6 @@ uint32_t MS5611_ReadADC(MS5611_t* ms5611) {
     uint8_t data[3];
 
     HAL_GPIO_WritePin(ms5611->cs_gpio_port, ms5611->cs_pin, GPIO_PIN_RESET);
-    HAL_Delay(1);
 
     MS5611_SPI_ReadWrite(ms5611, MS5611_CMD_ADC_READ);
     data[0] = MS5611_SPI_ReadWrite(ms5611, 0x00); // MSB
@@ -135,7 +141,6 @@ uint32_t MS5611_ReadADC(MS5611_t* ms5611) {
     data[2] = MS5611_SPI_ReadWrite(ms5611, 0x00); // LSB
 
     HAL_GPIO_WritePin(ms5611->cs_gpio_port, ms5611->cs_pin, GPIO_PIN_SET);
-    HAL_Delay(1);
 
     return ((uint32_t)data[0] << 16) | ((uint32_t)data[1] << 8) | data[2];
 }
@@ -148,17 +153,25 @@ uint32_t MS5611_ReadRawPressure(MS5611_t* ms5611) {
     // Iniciar conversión
     MS5611_SendCommand(ms5611, cmd);
 
-    // Esperar conversión según OSR
-    uint16_t delay_ms;
+    // Polling rápido del bit BUSY en vez de delay fijo
+    // Timeout según OSR (máximo teórico + margen)
+    uint16_t timeout_ms;
     switch(ms5611->osr) {
-        case 0: delay_ms = 1; break;   // OSR=256
-        case 1: delay_ms = 2; break;   // OSR=512
-        case 2: delay_ms = 3; break;   // OSR=1024
-        case 3: delay_ms = 5; break;   // OSR=2048
-        case 4: delay_ms = 10; break;  // OSR=4096
-        default: delay_ms = 10; break;
+        case 0: timeout_ms = 2; break;    // OSR=256 (max 0.6ms)
+        case 1: timeout_ms = 3; break;    // OSR=512 (max 1.2ms)
+        case 2: timeout_ms = 4; break;    // OSR=1024 (max 2.3ms)
+        case 3: timeout_ms = 6; break;    // OSR=2048 (max 4.6ms)
+        case 4: timeout_ms = 12; break;   // OSR=4096 (max 9.1ms)
+        default: timeout_ms = 12; break;
     }
-    HAL_Delay(delay_ms);
+
+    // Poll conversion complete (típicamente termina antes del máximo)
+    uint32_t start = HAL_GetTick();
+    while ((HAL_GetTick() - start) < timeout_ms) {
+        if (MS5611_IsReady(ms5611)) {
+            break;
+        }
+    }
 
     // Leer resultado
     return MS5611_ReadADC(ms5611);
@@ -172,17 +185,24 @@ uint32_t MS5611_ReadRawTemperature(MS5611_t* ms5611) {
     // Iniciar conversión
     MS5611_SendCommand(ms5611, cmd);
 
-    // Esperar conversión según OSR
-    uint16_t delay_ms;
+    // Polling rápido del bit BUSY en vez de delay fijo
+    uint16_t timeout_ms;
     switch(ms5611->osr) {
-        case 0: delay_ms = 1; break;   // OSR=256
-        case 1: delay_ms = 2; break;   // OSR=512
-        case 2: delay_ms = 3; break;   // OSR=1024
-        case 3: delay_ms = 5; break;   // OSR=2048
-        case 4: delay_ms = 10; break;  // OSR=4096
-        default: delay_ms = 10; break;
+        case 0: timeout_ms = 2; break;    // OSR=256 (max 0.6ms)
+        case 1: timeout_ms = 3; break;    // OSR=512 (max 1.2ms)
+        case 2: timeout_ms = 4; break;    // OSR=1024 (max 2.3ms)
+        case 3: timeout_ms = 6; break;    // OSR=2048 (max 4.6ms)
+        case 4: timeout_ms = 12; break;   // OSR=4096 (max 9.1ms)
+        default: timeout_ms = 12; break;
     }
-    HAL_Delay(delay_ms);
+
+    // Poll conversion complete
+    uint32_t start = HAL_GetTick();
+    while ((HAL_GetTick() - start) < timeout_ms) {
+        if (MS5611_IsReady(ms5611)) {
+            break;
+        }
+    }
 
     // Leer resultado
     return MS5611_ReadADC(ms5611);

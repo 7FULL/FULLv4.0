@@ -2,8 +2,8 @@
 # ROCKET FLIGHT COMPUTER - CONFIGURATION FILE
 ################################################################################
 #
-# This file configures the behavior of the MASTER MCU hardware test and
-# flight software. Copy this file to your SD card as "rocket_config.txt"
+# This file configures the MASTER MCU for hardware testing and flight operations
+# Copy this file to your SD card as "rocket_config.txt"
 #
 # Format: PARAMETER_NAME=value
 # Lines starting with # are comments and will be ignored
@@ -11,11 +11,11 @@
 ################################################################################
 
 #==============================================================================
-# ACCELEROMETER CONFIGURATION (KX134-1211)
+# HARDWARE TEST CONFIGURATION
 #==============================================================================
 
 # ACCELEROMETER_RANGE
-# Configures the measurement range of the high-G accelerometer
+# Configures the measurement range of the high-G accelerometer (KX134-1211)
 #
 # Valid values:
 #   0 = ±8g   - Ground testing, orientation detection, low G maneuvers
@@ -29,104 +29,476 @@
 #   ±32g: 0.000977g per bit (good balance)
 #   ±64g: 0.001953g per bit (least precise)
 #
-# IMPORTANT for flight:
+# IMPORTANT:
 #   - Use 0 (±8g) for GROUND TESTING to verify 1.0G gravity reading
 #   - Use 2 (±32g) or 3 (±64g) for ACTUAL FLIGHTS to avoid saturation
-#
-# Example scenarios:
-#   - Testing on bench: 0 (±8g)
-#   - Small Estes rocket: 1 (±16g)
-#   - Mid-power rocket (E-G motors): 2 (±32g)
-#   - High-power rocket (H+ motors): 3 (±64g)
 
 ACCELEROMETER_RANGE=0
 
-#==============================================================================
-# GPS CONFIGURATION (ZOE-M8Q)
-#==============================================================================
-
 # GPS_TIMEOUT_SECONDS
-# Maximum time to wait for GPS fix during hardware test
+# Maximum time to wait for GPS fix during hardware test (ZOE-M8Q)
 #
-# Valid range: 1 to 600 seconds (1 second to 10 minutes)
-#
-# Typical GPS acquisition times:
-#   - Cold start (no almanac): 26-30 seconds
-#   - Warm start (almanac available): 25-28 seconds
-#   - Hot start (ephemeris available): 1 second
-#   - Indoor/obstructed view: May never acquire fix
+# Valid range: 1 to 600 seconds
+# Typical acquisition: 26-30 seconds (cold start), 1 second (hot start)
 #
 # Recommendations:
-#   - Ground testing: 300 (5 minutes) - gives GPS time to acquire
-#   - Quick testing: 60 (1 minute) - fast iteration
-#   - Skip GPS test: 1 (1 second) - when GPS is not needed
-#
-# NOTE: GPS needs clear view of the sky. Indoor testing may fail.
+#   - Ground testing: 300 (5 minutes)
+#   - Quick testing: 60 (1 minute)
+#   - Skip GPS test: 1 (1 second)
 
 GPS_TIMEOUT_SECONDS=300
 
 #==============================================================================
-# NOTES FOR FLIGHT SOFTWARE (Future Parameters)
+# FLIGHT DETECTION PARAMETERS
 #==============================================================================
-#
-# The following parameters are used by the flight software state machine
-# (not currently active in hardware test mode, but documented for reference)
-#
+
 # LAUNCH_DETECTION_THRESHOLD
-#   - Acceleration threshold to detect liftoff (in G)
-#   - Typical: 2.5 to 5.0 G
-#   - Must be higher than vibration noise
+# Acceleration threshold to detect liftoff (in G)
 #
+# Range: 2.0 to 10.0 G
+# Default: 2.5 G
+#
+# How it works:
+#   - When acceleration exceeds this value, launch is detected
+#   - State transitions: ARMED → BOOST
+#
+# Recommendations:
+#   - Small rockets (A-D motors): 2.5 G
+#   - Mid-power (E-G motors): 3.0 G
+#   - High-power (H+ motors): 4.0 G
+#   - Must be above ground vibration noise (typically < 1.5 G)
+
+LAUNCH_DETECTION_THRESHOLD=2.5
+
 # COAST_DETECTION_THRESHOLD
-#   - Acceleration threshold to detect motor burnout (in G)
-#   - Typical: 1.0 to 1.5 G (near gravity)
-#   - Transition from BOOST to COAST state
+# Acceleration threshold to detect motor burnout (in G)
 #
-# APOGEE_DESCENT_TIME_MS
-#   - Time descending before confirming apogee (milliseconds)
-#   - Prevents false apogee detection from wind gusts
-#   - Typical: 3000 to 5000 ms
+# Range: 0.5 to 2.0 G
+# Default: 1.5 G
 #
+# How it works:
+#   - When acceleration drops below this value, coast phase detected
+#   - State transitions: BOOST → COAST
+#
+# Typical: 1.0 to 1.5 G (near Earth gravity)
+
+COAST_DETECTION_THRESHOLD=1.5
+
+# BOOST_TIMEOUT_MS
+# Maximum time allowed in BOOST state - safety timeout (milliseconds)
+#
+# Range: 1000 to 20000 ms
+# Default: 10000 ms (10 seconds)
+#
+# How it works:
+#   - If motor burns longer than this, force transition to COAST
+#   - Safety mechanism for stuck igniters or motor failures
+#   - Deploys drogue parachute even if motor is still burning
+#   - State transitions: BOOST → COAST (emergency)
+#
+# Recommendations:
+#   - Small motors (A-D): 5000 ms (5 seconds)
+#   - Mid-power (E-G): 8000 ms (8 seconds)
+#   - High-power (H+): 10000 ms (10 seconds)
+#
+# IMPORTANT:
+#   - Set longer than your longest expected motor burn time
+#   - Too short: premature apogee detection during normal flight
+#   - Too long: delayed recovery deployment in case of motor failure
+
+BOOST_TIMEOUT_MS=10000
+
+# COAST_TIMEOUT_MS
+# Maximum time allowed in COAST state - safety timeout (milliseconds)
+#
+# Range: 3000 to 15000 ms
+# Default: 5000 ms (5 seconds)
+#
+# How it works:
+#   - If coasting longer than this without detecting apogee, force APOGEE
+#   - Safety fallback if velocity and altitude-drop methods fail
+#   - State transitions: COAST → APOGEE (emergency)
+#
+# Recommendations:
+#   - Small rockets (< 100m): 3000 ms (3 seconds)
+#   - Mid-power (100-500m): 5000 ms (5 seconds)
+#   - High-power (> 500m): 8000 ms (8 seconds)
+#
+# IMPORTANT:
+#   - This is a LAST RESORT safety mechanism
+#   - Primary detection: APOGEE_VELOCITY_THRESHOLD (velocity-based)
+#   - Secondary detection: APOGEE_ALTITUDE_DROP_THRESHOLD (altitude-based)
+#   - Set longer than expected coast time to apogee
+
+COAST_TIMEOUT_MS=5000
+
+# APOGEE_VELOCITY_THRESHOLD
+# Vertical velocity threshold for apogee detection (m/s)
+#
+# Range: 0.5 to 5.0 m/s
+# Default: 2.0 m/s
+#
+# How it works:
+#   - If vertical velocity is NEGATIVE (descending) and magnitude exceeds this
+#   - Apogee is confirmed immediately without waiting for descent time
+#   - More accurate and faster than time-based detection
+#
+# Recommendations:
+#   - Small/slow rockets: 1.0 m/s
+#   - Mid-power rockets: 2.0 m/s
+#   - High-power rockets: 3.0 m/s
+
+APOGEE_VELOCITY_THRESHOLD=2.0
+
+# APOGEE_ALTITUDE_DROP_THRESHOLD
+# Altitude drop from maximum to detect apogee (meters)
+#
+# Range: 1.0 to 20.0 m
+# Default: 5.0 m
+#
+# How it works:
+#   - This is a FALLBACK method if velocity-based detection fails
+#   - If altitude drops by this amount from max_altitude, apogee is confirmed
+#   - Used together with COAST_TIMEOUT_MS as safety backup
+#   - State transitions: COAST → APOGEE
+#
+# Recommendations:
+#   - Small rockets (< 100m apogee): 3.0 m
+#   - Mid-power rockets (100-500m): 5.0 m
+#   - High-power rockets (> 500m): 10.0 m
+#   - Noisy barometer: increase value to avoid false triggers
+#
+# IMPORTANT:
+#   - Too small: false apogee from sensor noise or wind
+#   - Too large: delayed apogee detection, late drogue deployment
+#   - Primary detection is APOGEE_VELOCITY_THRESHOLD (more accurate)
+
+APOGEE_ALTITUDE_DROP_THRESHOLD=5.0
+
+#==============================================================================
+# LANDING DETECTION PARAMETERS
+#==============================================================================
+
 # ALTITUDE_STABLE_THRESHOLD
-#   - Altitude variation threshold for landing detection (meters)
-#   - Typical: 2.0 to 5.0 m
+# Maximum altitude variation to consider "stable" (meters)
 #
+# Range: 0.5 to 10.0 m
+# Default: 2.0 m
+#
+# How it works:
+#   - If altitude changes less than this value, it's considered stable
+#   - Used for both arming and landing detection
+
+ALTITUDE_STABLE_THRESHOLD=2.0
+
 # STABLE_TIME_LANDING_MS
-#   - Time with stable altitude to confirm landing (milliseconds)
-#   - Typical: 5000 to 10000 ms
+# Time with stable altitude to confirm landing (milliseconds)
 #
+# Range: 3000 to 30000 ms
+# Default: 8000 ms (8 seconds)
+#
+# How it works:
+#   - Altitude must remain stable for this duration
+#   - State transitions: PARACHUTE → LANDED
+#   - After landing, data is transferred from Flash to SD card
+
+STABLE_TIME_LANDING_MS=5000
+
+#==============================================================================
+# ARMING SAFETY PARAMETERS
+#==============================================================================
+
+# SLEEP_TIMEOUT_MS
+# Time in SLEEP state before transitioning to ARMED (milliseconds)
+#
+# Range: 5000 to 60000 ms
+# Default: 10000 ms (10 seconds)
+#
+# How it works:
+#   - On boot, system enters SLEEP state
+#   - After this timeout, checks arming conditions
+#   - If conditions met, transitions to ARMED
+#
+# Purpose: Prevents immediate arming, gives time to check hardware
+
+SLEEP_TIMEOUT_MS=10000
+
+# ARMING_STABLE_TIME_MS
+# Time altitude must be stable before arming (milliseconds)
+#
+# Range: 1000 to 30000 ms
+# Default: 3000 ms (3 seconds)
+#
+# How it works:
+#   - Altitude must not change more than ALTITUDE_STABLE_THRESHOLD
+#   - For this duration before arming is allowed
+#
+# Purpose: Prevents arming while rocket is being moved or transported
+
+ARMING_STABLE_TIME_MS=3000
+
+# ARMING_ALTITUDE_MAX_DELTA
+# Maximum altitude change allowed during arming period (meters)
+#
+# Range: 1.0 to 20.0 m
+# Default: 5.0 m
+#
+# How it works:
+#   - Compares current altitude to initial altitude when arming started
+#   - If difference exceeds this value, arming fails
+#
+# Purpose: Detects if rocket is being lifted onto launch pad
+
+ARMING_ALTITUDE_MAX_DELTA=5.0
+
+# REQUIRE_GPS_LOCK
+# Require valid GPS fix before arming
+#
+# Valid values: true or false
+# Default: false
+#
+# How it works:
+#   - If true, GPS must have valid fix (satellites locked) before arming
+#   - If false, GPS is optional
+#
+# Recommendations:
+#   - Competition flights: true (for GPS-based recovery)
+#   - Test flights without GPS: false
+
+REQUIRE_GPS_LOCK=false
+
+#==============================================================================
+# SENSOR SAFETY PARAMETERS
+#==============================================================================
+
+# SENSOR_TIMEOUT_MS
+# Maximum time without valid sensor reading before marking as failed (ms)
+#
+# Range: 100 to 5000 ms
+# Default: 1000 ms (1 second)
+#
+# How it works:
+#   - Tracks last successful read from each sensor
+#   - If sensor doesn't respond for this duration → marked invalid
+#   - Invalid sensors trigger ERROR state
+#
+# Applies to:
+#   - Accelerometer (KX134)
+#   - Barometer (MS5611)
+#   - GPS (optional, based on REQUIRE_GPS_LOCK)
+
+SENSOR_TIMEOUT_MS=1000
+
+#==============================================================================
+# PYROTECHNIC CHANNEL CONFIGURATION
+#==============================================================================
+
+# PYRO_ENABLE
+# Global enable/disable for ALL pyrotechnic channels
+#
+# Valid values: true or false
+# Default: true
+#
+# How it works:
+#   - If true: Pyro channels activate normally according to flight logic
+#   - If false: All pyro activations are SKIPPED (no igniters fired)
+#   - State machine still logs when deployment WOULD occur
+#   - Useful for rockets where parachutes deploy naturally from motor exhaust
+#
+# Use cases:
+#   - true: Standard deployment with e-matches/igniters
+#   - false: Natural deployment rockets (motor ejection), testing without pyros
+#
+# CRITICAL SAFETY:
+#   - Setting this to false disables ALL recovery deployment systems
+#   - Only use false if you have alternative recovery mechanism
+#   - Verify parachute deployment method before flight!
+#
+# Applies to:
+#   - Drogue deployment at apogee
+#   - Main deployment at altitude
+#   - Backup deployment on failure
+#   - Emergency deployment in ABORT state
+
+PYRO_ENABLE=true
+
+# Channel Assignment (0-3 maps to physical channels 1-4)
+# Each channel can be assigned to a specific function
+#
+# PYRO_DROGUE_CHANNEL - Drogue parachute deployment at apogee
+# PYRO_MAIN_CHANNEL - Main parachute deployment at specified altitude
+# PYRO_SEPARATION_CHANNEL - Stage separation (optional)
+# PYRO_BACKUP_CHANNEL - Backup/redundant deployment (optional)
+
+PYRO_DROGUE_CHANNEL=0
+PYRO_MAIN_CHANNEL=1
+PYRO_SEPARATION_CHANNEL=2
+PYRO_BACKUP_CHANNEL=3
+
+# Firing Duration (milliseconds)
+# How long to keep pyro channel activated
+#
+# Range: 500 to 10000 ms
+# Default: 3000 ms (3 seconds)
+#
+# WARNING: Longer duration = more heat/current draw
+# Ensure e-matches can handle the duration
+
+PYRO_DROGUE_DURATION_MS=3000
+PYRO_MAIN_DURATION_MS=3000
+
+# MAIN_DEPLOY_ALTITUDE_AGL
+# Altitude above ground level to deploy main parachute (meters)
+#
+# Range: 50 to 1000 m
+# Default: 300 m (984 feet)
+#
+# How it works:
+#   - "AGL" = Above Ground Level (relative to launch altitude)
+#   - When descending through this altitude, main chute deploys
+#   - Drogue keeps rocket stable until this altitude
+#
+# Recommendations:
+#   - Low-power rockets: 150-200 m
+#   - Mid-power rockets: 250-350 m
+#   - High-power rockets: 400-600 m
+#   - Must comply with local regulations (e.g., FAA, CAA)
+
+MAIN_DEPLOY_ALTITUDE_AGL=300
+
+# BACKUP_ACTIVATION_DELAY_MS
+# Time to wait after main chute deployment before checking for failure (milliseconds)
+#
+# Range: 2000 to 15000 ms
+# Default: 5000 ms (5 seconds)
+#
+# How it works:
+#   - After main parachute deploys, wait this long before checking velocity
+#   - Gives main chute time to fully deploy and slow the descent
+#   - If still descending too fast after this delay, backup activates
+#   - State: PARACHUTE (backup activation safety check)
+#
+# Recommendations:
+#   - Small rockets (< 1kg): 3000 ms (3 seconds)
+#   - Mid-power rockets (1-5kg): 5000 ms (5 seconds)
+#   - High-power rockets (> 5kg): 7000 ms (7 seconds)
+#
+# IMPORTANT:
+#   - Too short: backup fires before main fully deploys (false positive)
+#   - Too long: delayed backup in case of real main failure
+#   - Should be longer than main chute inflation time
+
+BACKUP_ACTIVATION_DELAY_MS=5000
+
+# BACKUP_VELOCITY_THRESHOLD
+# Vertical velocity threshold to trigger backup parachute (m/s, negative = descending)
+#
+# Range: -50.0 to -5.0 m/s
+# Default: -10.0 m/s (descending faster than 10 m/s)
+#
+# How it works:
+#   - After BACKUP_ACTIVATION_DELAY_MS, check vertical velocity
+#   - If velocity is MORE NEGATIVE than this threshold, backup activates
+#   - Example: -10.0 means "if descending faster than 10 m/s"
+#   - Protects against main chute failure (tangled, damaged, etc.)
+#   - State: PARACHUTE (backup activation safety check)
+#
+# Recommendations:
+#   - Conservative (activates easily): -8.0 m/s
+#   - Balanced (recommended): -10.0 m/s
+#   - Aggressive (only severe failures): -15.0 m/s
+#
+# IMPORTANT:
+#   - Must be NEGATIVE (descending velocity)
+#   - Too small magnitude (-5): may trigger on normal main descent
+#   - Too large magnitude (-20): won't trigger until very high speed
+#   - Consider expected descent rate with working main chute
+#   - Typical main chute descent: 5-8 m/s
+#   - Typical drogue-only descent: 15-25 m/s
+
+BACKUP_VELOCITY_THRESHOLD=-10.0
+
+#==============================================================================
+# DATA LOGGING PARAMETERS
+#==============================================================================
+
 # DATA_LOGGING_FREQ_MS
-#   - Interval between data log entries (milliseconds)
-#   - Typical: 10 ms (100 Hz) for detailed flight data
-#   - Lower = more data, higher memory usage
+# Interval between data log entries (milliseconds)
 #
+# Range: 5 to 1000 ms
+# Default: 5 ms (200 Hz)
+#
+# How it works:
+#   - Every X milliseconds, flight data is written to Flash memory
+#   - Lower value = more data points, higher memory usage
+#   - Flash capacity (W25Q128JVS - 16MB):
+#       5ms  (200Hz): ~262,000 samples = ~21.8 minutes of flight
+#      10ms  (100Hz): ~262,000 samples = ~43.7 minutes of flight
+#      20ms   (50Hz): ~262,000 samples = ~87.4 minutes of flight
+#
+# Recommendations:
+#   - Ultra-high fidelity: 5 ms (200 Hz) - excellent apogee detection
+#   - High-fidelity logging: 10 ms (100 Hz)
+#   - Standard logging: 20 ms (50 Hz)
+#   - Low-memory mode: 50 ms (20 Hz)
+
+DATA_LOGGING_FREQ_MS=5
+
+#==============================================================================
+# SIMULATION MODE (TESTING ONLY)
+#==============================================================================
+
 # SIMULATION_MODE
-#   - Enable simulated launch sequence for testing
-#   - Values: true or false
-#   - WARNING: Never enable for actual flight!
+# Enable simulated launch sequence for desktop testing
 #
+# Valid values: true or false
+# Default: false
+#
+# ⚠️ WARNING: NEVER ENABLE FOR ACTUAL FLIGHT! ⚠️
+#
+# How it works:
+#   - Simulates sensor readings for a complete launch sequence
+#   - Triggers state transitions without real flight
+#   - Used for testing state machine logic on the bench
+#
+# When enabled:
+#   - Accelerometer readings are overridden
+#   - Altitude profile is simulated
+#   - GPS coordinates are simulated
+
+SIMULATION_MODE=false
+
 ################################################################################
 # END OF CONFIGURATION FILE
 ################################################################################
 #
-# After editing this file:
-#   1. Save it as "rocket_config.txt" (without _EXAMPLE)
-#   2. Copy to the root directory of your SD card
+# USING THIS FILE:
+#   1. Save as "rocket_config.txt" (remove _EXAMPLE from filename)
+#   2. Copy to SD card root directory
 #   3. Insert SD card into flight computer
-#   4. Power on or reset the flight computer
-#   5. Configuration will be loaded automatically
-#   6. Check debug.txt on SD card to verify loaded values
+#   4. Power on - config loads automatically
+#   5. Check debug logs to verify values loaded correctly
 #
-# Configuration loading order:
-#   1. Hardware defaults (hardcoded in firmware)
-#   2. rocket_config.txt overrides (from SD card)
-#   3. If file missing or parameter invalid, default is used
+# VALIDATION:
+#   - Out-of-range values are clamped to valid range
+#   - Invalid parameters use default values
+#   - Check SD logs for warnings about invalid config
 #
-# Troubleshooting:
-#   - If config not loading, check debug.txt for error messages
-#   - Ensure file is named exactly "rocket_config.txt"
-#   - Ensure SD card is FAT32 formatted
-#   - Check that parameters use exact names (case-sensitive)
-#   - Verify values are within valid ranges
+# TESTING CONFIGURATIONS:
+#
+#   Ground Test (Hardware Checkout):
+#     ACCELEROMETER_RANGE=0
+#     SIMULATION_MODE=false
+#     GPS_TIMEOUT_SECONDS=60
+#
+#   Simulation Test (Desktop):
+#     SIMULATION_MODE=true
+#     ACCELEROMETER_RANGE=2
+#
+#   Flight Ready (Actual Launch):
+#     ACCELEROMETER_RANGE=2 or 3
+#     SIMULATION_MODE=false
+#     All thresholds tuned for your rocket
+#     REQUIRE_GPS_LOCK=true (if using GPS recovery)
 #
 ################################################################################

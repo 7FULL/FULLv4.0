@@ -86,10 +86,10 @@ bool ZOE_M8Q_IsDataAvailable(ZOE_M8Q_t *gps) {
 
     uint8_t data_length[2];
 
-    // Leer los registros de longitud de datos
+    // Leer los registros de longitud de datos (reduced timeout)
     if (HAL_I2C_Mem_Read(gps->hi2c, ZOE_M8Q_I2C_ADDR << 1,
                          ZOE_M8Q_REG_DATA_LENGTH_H, I2C_MEMADD_SIZE_8BIT,
-                         data_length, 2, 100) != HAL_OK) {
+                         data_length, 2, 10) != HAL_OK) {  // 10ms timeout instead of 100ms
         return false;
     }
 
@@ -102,10 +102,10 @@ bool ZOE_M8Q_ReadData(ZOE_M8Q_t *gps) {
 
     uint8_t data_length[2];
 
-    // Leer longitud de datos disponibles
+    // Leer longitud de datos disponibles (reduced timeout for non-blocking operation)
     if (HAL_I2C_Mem_Read(gps->hi2c, ZOE_M8Q_I2C_ADDR << 1,
                          ZOE_M8Q_REG_DATA_LENGTH_H, I2C_MEMADD_SIZE_8BIT,
-                         data_length, 2, 100) != HAL_OK) {
+                         data_length, 2, 10) != HAL_OK) {  // 10ms timeout instead of 100ms
         return false;
     }
 
@@ -117,11 +117,11 @@ bool ZOE_M8Q_ReadData(ZOE_M8Q_t *gps) {
         available_bytes = sizeof(gps->nmea_buffer) - 1;
     }
 
-    // Leer los datos
+    // Leer los datos (reduced timeout for non-blocking operation)
     uint8_t temp_buffer[256];
     if (HAL_I2C_Mem_Read(gps->hi2c, ZOE_M8Q_I2C_ADDR << 1,
                          ZOE_M8Q_REG_DATA_STREAM, I2C_MEMADD_SIZE_8BIT,
-                         temp_buffer, available_bytes, 200) != HAL_OK) {
+                         temp_buffer, available_bytes, 50) != HAL_OK) {  // 50ms timeout instead of 200ms
         return false;
     }
 

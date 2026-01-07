@@ -49,6 +49,7 @@ bool MS5611_Init(MS5611_t* ms5611, SPI_HandleTypeDef *hspi, GPIO_TypeDef *cs_por
 bool MS5611_Reset(MS5611_t* ms5611);
 bool MS5611_ReadPROM(MS5611_t* ms5611);
 bool MS5611_IsValidPROM(MS5611_t* ms5611);
+bool MS5611_IsReady(MS5611_t* ms5611);
 bool MS5611_SetOSR(MS5611_t* ms5611, uint8_t osr);
 uint32_t MS5611_ReadRawPressure(MS5611_t* ms5611);
 uint32_t MS5611_ReadRawTemperature(MS5611_t* ms5611);

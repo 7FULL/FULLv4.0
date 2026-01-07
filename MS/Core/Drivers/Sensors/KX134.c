@@ -38,13 +38,11 @@ uint8_t KX134_ReadRegister(KX134_t* kx134, uint8_t reg) {
     if (!kx134 || !kx134->is_initialized) return 0;
 
     HAL_GPIO_WritePin(kx134->cs_gpio_port, kx134->cs_pin, GPIO_PIN_RESET);
-    HAL_Delay(1);
 
     KX134_SPI_ReadWrite(kx134, reg | 0x80); // Bit 7 = 1 para lectura
     uint8_t value = KX134_SPI_ReadWrite(kx134, 0x00);
 
     HAL_GPIO_WritePin(kx134->cs_gpio_port, kx134->cs_pin, GPIO_PIN_SET);
-    HAL_Delay(1);
 
     return value;
 }
@@ -53,13 +51,11 @@ bool KX134_WriteRegister(KX134_t* kx134, uint8_t reg, uint8_t value) {
     if (!kx134 || !kx134->is_initialized) return false;
 
     HAL_GPIO_WritePin(kx134->cs_gpio_port, kx134->cs_pin, GPIO_PIN_RESET);
-    HAL_Delay(1);
 
     KX134_SPI_ReadWrite(kx134, reg); // Bit 7 = 0 para escritura
     KX134_SPI_ReadWrite(kx134, value);
 
     HAL_GPIO_WritePin(kx134->cs_gpio_port, kx134->cs_pin, GPIO_PIN_SET);
-    HAL_Delay(1);
 
     return true;
 }
@@ -128,7 +124,6 @@ bool KX134_ReadAccelRaw(KX134_t* kx134, int16_t *x, int16_t *y, int16_t *z) {
 
     // Leer los 6 bytes consecutivos de datos de aceleración
     HAL_GPIO_WritePin(kx134->cs_gpio_port, kx134->cs_pin, GPIO_PIN_RESET);
-    HAL_Delay(1);
 
     KX134_SPI_ReadWrite(kx134, KX134_XOUT_L | 0x80); // Lectura múltiple
 
@@ -137,7 +132,6 @@ bool KX134_ReadAccelRaw(KX134_t* kx134, int16_t *x, int16_t *y, int16_t *z) {
     }
 
     HAL_GPIO_WritePin(kx134->cs_gpio_port, kx134->cs_pin, GPIO_PIN_SET);
-    HAL_Delay(1);
 
     // Combinar bytes (little endian)
     *x = (int16_t)((data[1] << 8) | data[0]);
@@ -170,7 +164,7 @@ bool KX134_ReadAccelG(KX134_t* kx134, KX134_AccelData_t *accel) {
         return false;
     }
 
-    accel->x = KX134_ConvertToG(raw_x, kx134->range);
+    accel->x = -KX134_ConvertToG(raw_x, kx134->range); // TODO the sensor is mounted inverted on the board
     accel->y = KX134_ConvertToG(raw_y, kx134->range);
     accel->z = KX134_ConvertToG(raw_z, kx134->range);
 
