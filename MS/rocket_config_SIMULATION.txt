@@ -30,10 +30,9 @@ LAUNCH_DETECTION_THRESHOLD=2.5
 COAST_DETECTION_THRESHOLD=1.5
 BOOST_TIMEOUT_MS=10000
 COAST_TIMEOUT_MS=5000
-APOGEE_VELOCITY_THRESHOLD=2.0
 APOGEE_ALTITUDE_DROP_THRESHOLD=5.0
 
-ALTITUDE_STABLE_THRESHOLD=2.0
+ALTITUDE_STABLE_THRESHOLD=5.0
 STABLE_TIME_LANDING_MS=8000
 
 #==============================================================================
@@ -68,13 +67,14 @@ PYRO_MAIN_DURATION_MS=3000
 MAIN_DEPLOY_ALTITUDE_AGL=300
 
 BACKUP_ACTIVATION_DELAY_MS=5000
-BACKUP_VELOCITY_THRESHOLD=-10.0
 
 #==============================================================================
 # DATA LOGGING
 #==============================================================================
 
 DATA_LOGGING_FREQ_MS=5
+BAROMETER_OSR=0
+FLASH_PREINIT_DURATION_S=120
 
 ################################################################################
 # SIMULATED FLIGHT PROFILE
@@ -93,7 +93,7 @@ DATA_LOGGING_FREQ_MS=5
 #   t=5s:   ARMED (after sleep timeout + arming checks)
 #   t=7s:   BOOST (launch detected at >2.5G)
 #   t=10s:  COAST (acceleration drops below 1.5G)
-#   t=15s:  APOGEE (velocity-based or time-based detection)
+#   t=15s:  APOGEE (altitude-based or time-based detection)
 #   t=15s:  PARACHUTE (drogue deployed immediately)
 #   t=30s:  Main deployed at 300m AGL
 #   t=48s:  LANDED (altitude stable for 8 seconds)

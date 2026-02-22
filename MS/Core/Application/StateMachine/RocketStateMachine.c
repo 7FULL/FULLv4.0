@@ -12,7 +12,7 @@
 #define DEFAULT_COAST_DETECTION_THRESHOLD  1.5f    // 1.5G coast detection
 #define DEFAULT_BOOST_TIMEOUT_MS          10000    // 10 seconds max in BOOST (safety for stuck motor)
 #define DEFAULT_COAST_TIMEOUT_MS           5000    // 5 seconds max in COAST before forcing apogee
-#define DEFAULT_ALTITUDE_STABLE_THRESHOLD  2.0f    // 2m difference to consider stable
+#define DEFAULT_ALTITUDE_STABLE_THRESHOLD  5.0f    // 5m range to consider stable (MS5611 has ~1-2m noise)
 #define DEFAULT_STABLE_TIME_LANDING_MS     8000    // 8 seconds stable altitude to confirm landing
 #define DEFAULT_SLEEP_TIMEOUT_MS          10000    // 10 seconds in sleep before arming
 #define DEFAULT_DATA_LOGGING_FREQ_MS         5     // 5ms = 200Hz logging frequency
@@ -20,6 +20,11 @@
 
 // Sensor configuration defaults
 #define DEFAULT_ACCELEROMETER_RANGE          2     // ±32g range (0=±8g, 1=±16g, 2=±32g, 3=±64g)
+#define DEFAULT_BAROMETER_OSR                0     // OSR=256 (0.6 ms, fastest). 0-4 valid.
+
+// Flash pre-initialisation default: erase enough sectors for this many seconds of logging.
+// Covers ARMED wait + boost + coast + parachute + landing detection with margin.
+#define DEFAULT_FLASH_PREINIT_DURATION_S   300     // 5 minutes — conservative for any small rocket
 
 // Safety defaults
 #define DEFAULT_SENSOR_TIMEOUT_MS          1000    // 1 second sensor timeout
@@ -37,13 +42,11 @@
 #define DEFAULT_PYRO_MAIN_DURATION_MS     3000     // 3 seconds
 #define DEFAULT_MAIN_DEPLOY_ALTITUDE_AGL 300.0f    // 300m AGL for main chute
 
-// Improved apogee detection
-#define DEFAULT_APOGEE_VELOCITY_THRESHOLD       2.0f    // 2.0 m/s vertical velocity
+// Apogee detection
 #define DEFAULT_APOGEE_ALTITUDE_DROP_THRESHOLD  5.0f    // 5.0m altitude drop from max
 
 // Backup parachute deployment (safety)
 #define DEFAULT_BACKUP_ACTIVATION_DELAY_MS     5000     // 5 seconds after main deployment
-#define DEFAULT_BACKUP_VELOCITY_THRESHOLD    -10.0f     // -10 m/s (descending faster than 10 m/s)
 
 extern SDLogger_t sdlogger;
 
@@ -151,7 +154,25 @@ bool RocketStateMachine_Init(RocketStateMachine_t* rocket,
             SDLogger_WriteText(&sdlogger, "ERROR: MS5611 initialization failed");
             return false;
         }
-        SDLogger_WriteText(&sdlogger, "MS5611 barometer OK");
+
+        // Apply configured OSR — conversion time is derived from this value automatically
+        MS5611_SetOSR(rocket->barometer, rocket->config.barometer_osr);
+
+        // Blocking read once at boot to establish the ground altitude reference.
+        // This is the only place MS5611_ReadData() is allowed; the flight loop
+        // uses MS5611_Update() (non-blocking) from this point onwards.
+        MS5611_Data_t baro_init;
+        if (MS5611_ReadData(rocket->barometer, &baro_init)) {
+            rocket->current_data.altitude    = baro_init.altitude;
+            rocket->current_data.pressure    = baro_init.pressure;
+            rocket->current_data.temperature = baro_init.temperature;
+        }
+
+        char baro_msg[80];
+        uint32_t conv_ms = MS5611_GetConversionTime_ms(rocket->config.barometer_osr);
+        sprintf(baro_msg, "MS5611 barometer OK (OSR=%u, conv=%lu ms)",
+                rocket->config.barometer_osr, conv_ms);
+        SDLogger_WriteText(&sdlogger, baro_msg);
 
         // Initialize GPS on I2C3 (optional - can fail)
         if (!ZOE_M8Q_Init(rocket->gps, &hi2c3)) {
@@ -201,10 +222,6 @@ bool RocketStateMachine_Init(RocketStateMachine_t* rocket,
     rocket->arming_stable_start_time = now;
     rocket->arming_reference_altitude = rocket->ground_altitude;
 
-    // Inicializar velocity tracking
-    rocket->vertical_velocity = 0.0f;
-    rocket->last_velocity_altitude = rocket->ground_altitude;
-    rocket->last_velocity_time = now;
 
     char init_msg[100];
     sprintf(init_msg, "ROCKET: Initialized at altitude: %ld.%02dm",
@@ -229,7 +246,6 @@ bool RocketStateMachine_Init(RocketStateMachine_t* rocket,
         } else {
             SDLogger_WriteText(&sdlogger, "ERROR: Failed to recover previous flight data");
             SDLogger_WriteText(&sdlogger, "WARNING: Flash may still contain old data");
-			return false;
         }
     } else {
         SDLogger_WriteText(&sdlogger, "Flash is empty - ready for new flight");
@@ -338,16 +354,22 @@ void RocketStateMachine_SimulateFlightData(RocketStateMachine_t* rocket) {
     rocket->baro_valid = true;
     rocket->gps_valid = true;
 
-    // Log simulation progress periodically
+    // Log simulation progress periodically (only when not in flight states)
     static uint32_t last_log = 0;
     if (HAL_GetTick() - last_log > 5000) {
-        char sim_msg[100];
-        sprintf(sim_msg, "SIM: t=%.1fs alt=%.1fm accel=%.1fG state=%s",
-                elapsed_sec,
-                rocket->current_data.altitude - rocket->ground_altitude,
-                rocket->current_data.acceleration_x,
-                state_names[rocket->current_state]);
-        SDLogger_WriteText(&sdlogger, sim_msg);
+        // Only log if not in flight states to avoid SD blocking
+        bool in_sim_flight = (rocket->current_state >= ROCKET_STATE_ARMED &&
+                              rocket->current_state <= ROCKET_STATE_PARACHUTE);
+
+        if (!in_sim_flight) {
+            char sim_msg[100];
+            sprintf(sim_msg, "SIM: t=%.1fs alt=%.1fm accel=%.1fG state=%s",
+                    elapsed_sec,
+                    rocket->current_data.altitude - rocket->ground_altitude,
+                    rocket->current_data.acceleration_x,
+                    state_names[rocket->current_state]);
+            SDLogger_WriteText(&sdlogger, sim_msg);
+        }
         last_log = HAL_GetTick();
     }
 }
@@ -434,7 +456,7 @@ void RocketStateMachine_Update(RocketStateMachine_t* rocket) {
         case ROCKET_STATE_ARMED:
             if (rocket->current_data.acceleration_x > rocket->config.launch_detection_threshold) {
                 next_state = ROCKET_STATE_BOOST;
-                SDLogger_WriteText(&sdlogger, "LAUNCH DETECTED");
+                // Don't write to SD during flight
             }
             break;
 
@@ -446,7 +468,7 @@ void RocketStateMachine_Update(RocketStateMachine_t* rocket) {
 
             // Safety timeout: motor burning too long (stuck igniter, etc.)
             if (time_in_state > rocket->config.boost_timeout_ms) {
-                SDLogger_WriteText(&sdlogger, "WARNING: BOOST timeout - forcing APOGEE");
+                // Don't write to SD during flight
                 next_state = ROCKET_STATE_COAST;
             }
             break;
@@ -457,25 +479,19 @@ void RocketStateMachine_Update(RocketStateMachine_t* rocket) {
                 rocket->max_altitude = rocket->current_data.altitude;
             }
 
-            // Apogee detection - multiple independent methods
+            // Apogee detection - altitude and time based only (no velocity)
             bool apogee_detected = false;
 
-            // Method 1: Velocity-based (PRIMARY - most accurate)
-            if (rocket->vertical_velocity < -rocket->config.apogee_velocity_threshold) {
-                apogee_detected = true;  // Descending at significant rate
-                SDLogger_WriteText(&sdlogger, "APOGEE: Detected by velocity");
-            }
-
-            // Method 2: Altitude drop (FALLBACK - if velocity calculation fails)
+            // Method 1: Altitude drop (PRIMARY - reliable and simple)
             if (rocket->current_data.altitude < (rocket->max_altitude - rocket->config.apogee_altitude_drop_threshold)) {
-                apogee_detected = true;  // Altitude dropped significantly
-                SDLogger_WriteText(&sdlogger, "APOGEE: Detected by altitude drop");
+                apogee_detected = true;  // Altitude dropped significantly from peak
+                // Don't write to SD during flight
             }
 
-            // Method 3: Time-based safety (EMERGENCY - something went wrong)
+            // Method 2: Time-based safety (FALLBACK - emergency timeout)
             if (time_in_state > rocket->config.coast_timeout_ms) {
-                apogee_detected = true;  // Been coasting too long
-                SDLogger_WriteText(&sdlogger, "APOGEE: Detected by timeout (safety)");
+                apogee_detected = true;  // Been coasting too long, must be past apogee
+                // Don't write to SD during flight
             }
 
             if (apogee_detected) {
@@ -502,9 +518,7 @@ void RocketStateMachine_Update(RocketStateMachine_t* rocket) {
                     // Only activate if pyro channels are enabled
                     if (rocket->config.pyro_enable) {
                         PyroChannels_ActivateChannel(main_ch);
-                        SDLogger_WriteText(&sdlogger, "MAIN CHUTE DEPLOYED");
-                    } else {
-                        SDLogger_WriteText(&sdlogger, "MAIN CHUTE DEPLOYMENT SKIPPED (PYRO_DISABLED)");
+                        // Don't write to SD during flight
                     }
 
                     // Track main chute deployment for backup activation check
@@ -514,15 +528,19 @@ void RocketStateMachine_Update(RocketStateMachine_t* rocket) {
             }
 
             // BACKUP PARACHUTE SAFETY: Check if main chute failed to deploy properly
-            // If descending too fast after configured delay, activate backup channel
+            // If still descending rapidly after configured delay, activate backup channel
             if (rocket->main_chute_deployed && !rocket->backup_chute_activated) {
                 uint32_t time_since_main = now - rocket->main_chute_deploy_time;
 
                 // Wait configured delay before checking (allow main chute to deploy and slow descent)
                 if (time_since_main >= rocket->config.backup_activation_delay_ms) {
-                    // Check if vertical velocity indicates main chute failure
-                    // If still descending faster than threshold, activate backup
-                    if (rocket->vertical_velocity < rocket->config.backup_velocity_threshold) {
+                    // Check if altitude is dropping too fast (main chute failure indicator)
+                    // Calculate altitude change rate: if losing >20m in last 2 seconds = problem
+                    float altitude_drop = rocket->last_altitude - rocket->current_data.altitude;
+                    float time_delta = (now - rocket->stable_altitude_start_time) / 1000.0f; // seconds
+
+                    // If dropping faster than 10 m/s average, activate backup
+                    if (time_delta > 0 && (altitude_drop / time_delta) > 10.0f) {
                         uint8_t backup_ch = rocket->config.pyro_backup_channel;
 
                         // Activate backup channel
@@ -533,31 +551,33 @@ void RocketStateMachine_Update(RocketStateMachine_t* rocket) {
                         // Only activate if pyro channels are enabled
                         if (rocket->config.pyro_enable) {
                             PyroChannels_ActivateChannel(backup_ch);
-
-                            // Log the backup activation with velocity data
-                            char backup_msg[120];
-                            sprintf(backup_msg, "BACKUP CHUTE ACTIVATED - Main failed (velocity: %.2f m/s)",
-                                    rocket->vertical_velocity);
-                            SDLogger_WriteText(&sdlogger, backup_msg);
-                        } else {
-                            char backup_msg[120];
-                            sprintf(backup_msg, "BACKUP CHUTE SKIPPED (PYRO_DISABLED) - velocity: %.2f m/s",
-                                    rocket->vertical_velocity);
-                            SDLogger_WriteText(&sdlogger, backup_msg);
+                            // Don't write to SD during flight
                         }
                     }
                 }
             }
 
-            // Check for landing
-            if (fabsf(rocket->current_data.altitude - rocket->last_altitude) < rocket->config.altitude_stable_threshold) {
-                uint32_t stable_time = now - rocket->stable_altitude_start_time;
-                if (stable_time > rocket->config.stable_time_landing_ms) {
-                    next_state = ROCKET_STATE_LANDED;
-                }
-            } else {
+            // Check for landing - compare against reference altitude, not last reading
+            // This prevents barometer noise from constantly resetting the stable timer
+            if (rocket->stable_altitude_start_time == 0) {
+                // First time in PARACHUTE or after losing stability - set reference
                 rocket->last_altitude = rocket->current_data.altitude;
                 rocket->stable_altitude_start_time = now;
+            } else {
+                // Check if altitude is still close to reference altitude
+                float altitude_drift = fabsf(rocket->current_data.altitude - rocket->last_altitude);
+
+                if (altitude_drift < rocket->config.altitude_stable_threshold) {
+                    // Still stable - check if enough time has passed
+                    uint32_t stable_time = now - rocket->stable_altitude_start_time;
+                    if (stable_time > rocket->config.stable_time_landing_ms) {
+                        next_state = ROCKET_STATE_LANDED;
+                    }
+                } else {
+                    // Altitude drifted too much - reset reference and timer
+                    rocket->last_altitude = rocket->current_data.altitude;
+                    rocket->stable_altitude_start_time = now;
+                }
             }
             break;
 
@@ -575,8 +595,8 @@ void RocketStateMachine_Update(RocketStateMachine_t* rocket) {
             break;
 
         case ROCKET_STATE_ERROR:
-            // Stay in ERROR state, log continuously
-            SDLogger_WriteText(&sdlogger, "ERROR state - sensor recovery attempt");
+            // Stay in ERROR state, log continuously (but not during flight to avoid blocking)
+            // Don't write to SD during flight
             break;
 
         case ROCKET_STATE_ABORT:
@@ -593,17 +613,41 @@ void RocketStateMachine_Update(RocketStateMachine_t* rocket) {
                 }
             }
 
-            if (rocket->config.pyro_enable) {
-                SDLogger_WriteText(&sdlogger, "ABORT - All recovery deployed");
-            } else {
-                SDLogger_WriteText(&sdlogger, "ABORT - Recovery deployment skipped (PYRO_DISABLED)");
-            }
+            // Don't write to SD during flight
             break;
     }
 
-    // State transition
+    // State transition with validation
     if (next_state != rocket->current_state) {
-        RocketStateMachine_ChangeState(rocket, next_state);
+        // Validate state transition to prevent invalid jumps
+        bool valid_transition = true;
+
+        // CRITICAL: APOGEE can only be reached from COAST or BOOST (emergency)
+        if (next_state == ROCKET_STATE_APOGEE) {
+            if (rocket->current_state != ROCKET_STATE_COAST &&
+                rocket->current_state != ROCKET_STATE_BOOST) {
+                // Invalid transition - stay in current state
+                valid_transition = false;
+            }
+        }
+
+        // COAST can only be reached from BOOST
+        if (next_state == ROCKET_STATE_COAST) {
+            if (rocket->current_state != ROCKET_STATE_BOOST) {
+                valid_transition = false;
+            }
+        }
+
+        // PARACHUTE can only be reached from APOGEE
+        if (next_state == ROCKET_STATE_PARACHUTE) {
+            if (rocket->current_state != ROCKET_STATE_APOGEE) {
+                valid_transition = false;
+            }
+        }
+
+        if (valid_transition) {
+            RocketStateMachine_ChangeState(rocket, next_state);
+        }
     }
 
     // Data logging (con control de frecuencia)
@@ -641,18 +685,53 @@ void RocketStateMachine_ChangeState(RocketStateMachine_t* rocket, RocketState_t 
 
     uint32_t now = HAL_GetTick();
 
-    // Log state transitions
-    char state_msg[100];
-    sprintf(state_msg, "STATE: %s -> %s",
-           state_names[rocket->current_state],
-           state_names[new_state]);
-    SDLogger_WriteText(&sdlogger, state_msg);
+    // Only log state transitions to SD when NOT in flight (to avoid blocking)
+    // During flight, all data goes to Flash only
+    bool in_flight = (rocket->current_state >= ROCKET_STATE_ARMED &&
+                      rocket->current_state <= ROCKET_STATE_PARACHUTE) ||
+                     (new_state >= ROCKET_STATE_ARMED &&
+                      new_state <= ROCKET_STATE_PARACHUTE);
+
+    if (!in_flight) {
+        char state_msg[100];
+        sprintf(state_msg, "STATE: %s -> %s",
+               state_names[rocket->current_state],
+               state_names[new_state]);
+        SDLogger_WriteText(&sdlogger, state_msg);
+    }
 
     // Handle state-specific actions
     if (new_state == ROCKET_STATE_ARMED) {
+        // Pre-erase flash sectors before flight so no erase ever happens mid-flight.
+        // Sector count is derived from the configured maximum flight duration and
+        // the configured logging frequency — no magic numbers.
+        uint32_t total_duration_ms = rocket->config.flash_preinit_duration_s * 1000UL;
+        uint32_t samples_needed    = (total_duration_ms + rocket->config.data_logging_frequency_ms - 1)
+                                     / rocket->config.data_logging_frequency_ms;
+        uint32_t bytes_needed      = samples_needed * (uint32_t)sizeof(FlightData_t);
+        uint32_t sectors_needed    = (bytes_needed + SPIFLASH_SECTOR_SIZE - 1) / SPIFLASH_SECTOR_SIZE;
+
+        if (sectors_needed > SPIFLASH_TOTAL_SECTORS) {
+            sectors_needed = SPIFLASH_TOTAL_SECTORS;
+        }
+
+        char preinit_msg[100];
+        sprintf(preinit_msg, "Flash pre-erase: %lu sectors (%lu s at %lu ms/sample)",
+                sectors_needed,
+                rocket->config.flash_preinit_duration_s,
+                rocket->config.data_logging_frequency_ms);
+        SDLogger_WriteText(&sdlogger, preinit_msg);
+
+        for (uint32_t i = 0; i < sectors_needed; i++) {
+            SPIFlash_EraseSector(rocket->spi_flash, i * SPIFLASH_SECTOR_SIZE);
+        }
+
+        SDLogger_WriteText(&sdlogger, "Flash pre-erase complete - no mid-flight erases will occur");
+
         // Start data logging
-        rocket->data_logging_active = true;
-        SDLogger_WriteText(&sdlogger, "Data logging STARTED");
+        rocket->data_logging_active  = true;
+        rocket->spi_write_address    = 0x000000;
+        rocket->total_data_points    = 0;
     }
 
     if (new_state == ROCKET_STATE_APOGEE) {
@@ -664,22 +743,31 @@ void RocketStateMachine_ChangeState(RocketStateMachine_t* rocket, RocketState_t 
         // Only activate if pyro channels are enabled
         if (rocket->config.pyro_enable) {
             PyroChannels_ActivateChannel(drogue_ch);
-            SDLogger_WriteText(&sdlogger, "DROGUE DEPLOYED");
-        } else {
-            SDLogger_WriteText(&sdlogger, "DROGUE DEPLOYMENT SKIPPED (PYRO_DISABLED)");
+            // Don't write to SD during flight
         }
     }
 
+    if (new_state == ROCKET_STATE_PARACHUTE) {
+        // Reset landing detection timer when entering PARACHUTE state
+        rocket->stable_altitude_start_time = 0;
+        rocket->last_altitude = 0.0f;
+    }
+
     if (new_state == ROCKET_STATE_ERROR) {
-        // Log sensor states
-        char error_msg[150];
-        sprintf(error_msg, "ERROR: Accel=%d Baro=%d GPS=%d",
-                rocket->accel_valid, rocket->baro_valid, rocket->gps_valid);
-        SDLogger_WriteText(&sdlogger, error_msg);
+        // Log sensor states only if not in flight
+        if (!in_flight) {
+            char error_msg[150];
+            sprintf(error_msg, "ERROR: Accel=%d Baro=%d GPS=%d",
+                    rocket->accel_valid, rocket->baro_valid, rocket->gps_valid);
+            SDLogger_WriteText(&sdlogger, error_msg);
+        }
     }
 
     if (new_state == ROCKET_STATE_ABORT) {
-        SDLogger_WriteText(&sdlogger, "ABORT STATE ENTERED");
+        // Log only if not in flight
+        if (!in_flight) {
+            SDLogger_WriteText(&sdlogger, "ABORT STATE ENTERED");
+        }
     }
 
     if (new_state == ROCKET_STATE_LANDED) {
@@ -757,19 +845,18 @@ bool RocketStateMachine_ReadSensors(RocketStateMachine_t* rocket) {
     rocket->current_data.angular_velocity_y = 0.0f;
     rocket->current_data.angular_velocity_z = 0.0f;
 
-    // Read barometer and track health
+    // Read barometer — non-blocking; returns true only when a fresh sample is ready.
+    // The conversion cycle (D1 then D2) runs across multiple loop iterations;
+    // timing is derived from the configured OSR via MS5611_GetConversionTime_ms().
     MS5611_Data_t ms_data;
-    if (MS5611_ReadData(rocket->barometer, &ms_data)) {
-        rocket->current_data.pressure = ms_data.pressure;
+    if (MS5611_Update(rocket->barometer, &ms_data)) {
+        rocket->current_data.pressure    = ms_data.pressure;
         rocket->current_data.temperature = ms_data.temperature;
-
-        if (!rocket->simulation_mode) {
-            rocket->current_data.altitude = (float)ms_data.altitude;
-        }
+        rocket->current_data.altitude    = ms_data.altitude;
         rocket->last_baro_update = now;
         rocket->baro_valid = true;
     } else {
-        // Check for timeout
+        // No new sample this cycle — only flag unhealthy on timeout
         if ((now - rocket->last_baro_update) > rocket->config.sensor_timeout_ms) {
             rocket->baro_valid = false;
         }
@@ -797,19 +884,6 @@ bool RocketStateMachine_ReadSensors(RocketStateMachine_t* rocket) {
             }
         }
     }
-
-    // Calculate vertical velocity for improved apogee detection
-    uint32_t dt = now - rocket->last_velocity_time;
-    if (dt >= 5) {  // Update velocity every 5ms (200Hz) - ultra-high-speed apogee detection
-        float altitude_delta = rocket->current_data.altitude - rocket->last_velocity_altitude;
-        float dt_seconds = dt / 1000.0f;
-        rocket->vertical_velocity = altitude_delta / dt_seconds;  // m/s
-        rocket->last_velocity_altitude = rocket->current_data.altitude;
-        rocket->last_velocity_time = now;
-    }
-
-    // Copy vertical velocity to flight data
-    rocket->current_data.vertical_velocity = rocket->vertical_velocity;
 
     // Include current rocket state in data
     rocket->current_data.rocket_state = rocket->current_state;
@@ -1003,7 +1077,7 @@ bool RocketStateMachine_TransferDataToSD(RocketStateMachine_t* rocket) {
     UINT bytes_written;
 
     // Escribir header
-    char header[] = "Timestamp,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ,Pressure,Temperature,Altitude,VerticalVelocity,Latitude,Longitude,GPS_Alt,State,Pyro0,Pyro1,Pyro2,Pyro3\r\n";
+    char header[] = "Timestamp,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ,Pressure,Temperature,Altitude,Latitude,Longitude,GPS_Alt,State,Pyro0,Pyro1,Pyro2,Pyro3\r\n";
     result = f_write(&csv_file, header, strlen(header), &bytes_written);
     if (result != FR_OK) {
         f_close(&csv_file);
@@ -1026,7 +1100,7 @@ bool RocketStateMachine_TransferDataToSD(RocketStateMachine_t* rocket) {
             uint8_t pyro3 = (flight_data.pyro_channel_states & 0x08) ? 1 : 0;
 
             char csv_line[300];
-            sprintf(csv_line, "%ld,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%02d,%ld.%02d,%ld.%02d,%ld.%03d,%ld.%06d,%ld.%06d,%ld.%02d,%s,%d,%d,%d,%d\r\n",
+            sprintf(csv_line, "%ld,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%02d,%ld.%02d,%ld.%02d,%ld.%06d,%ld.%06d,%ld.%02d,%s,%d,%d,%d,%d\r\n",
                    flight_data.timestamp,
                    (int32_t)(flight_data.acceleration_x), abs((int32_t)(flight_data.acceleration_x * 1000) % 1000),
                    (int32_t)(flight_data.acceleration_y), abs((int32_t)(flight_data.acceleration_y * 1000) % 1000),
@@ -1037,7 +1111,6 @@ bool RocketStateMachine_TransferDataToSD(RocketStateMachine_t* rocket) {
                    (int32_t)(flight_data.pressure), abs((int32_t)(flight_data.pressure * 100) % 100),
                    (int32_t)(flight_data.temperature), abs((int32_t)(flight_data.temperature * 100) % 100),
                    (int32_t)(flight_data.altitude), abs((int32_t)(flight_data.altitude * 100) % 100),
-                   (int32_t)(flight_data.vertical_velocity), abs((int32_t)(flight_data.vertical_velocity * 1000) % 1000),
                    (int32_t)(flight_data.latitude), abs((int32_t)(flight_data.latitude * 1000000) % 1000000),
                    (int32_t)(flight_data.longitude), abs((int32_t)(flight_data.longitude * 1000000) % 1000000),
                    (int32_t)(flight_data.gps_altitude), abs((int32_t)(flight_data.gps_altitude * 100) % 100),
@@ -1092,7 +1165,7 @@ bool RocketStateMachine_TransferDataToSD_Recovery(RocketStateMachine_t* rocket, 
     UINT bytes_written;
 
     // Escribir header
-    char header[] = "Timestamp,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ,Pressure,Temperature,Altitude,VerticalVelocity,Latitude,Longitude,GPS_Alt,State,Pyro0,Pyro1,Pyro2,Pyro3\r\n";
+    char header[] = "Timestamp,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ,Pressure,Temperature,Altitude,Latitude,Longitude,GPS_Alt,State,Pyro0,Pyro1,Pyro2,Pyro3\r\n";
     result = f_write(&csv_file, header, strlen(header), &bytes_written);
     if (result != FR_OK) {
         f_close(&csv_file);
@@ -1115,7 +1188,7 @@ bool RocketStateMachine_TransferDataToSD_Recovery(RocketStateMachine_t* rocket, 
             uint8_t pyro3 = (flight_data.pyro_channel_states & 0x08) ? 1 : 0;
 
             char csv_line[300];
-            sprintf(csv_line, "%ld,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%02d,%ld.%02d,%ld.%02d,%ld.%03d,%ld.%06d,%ld.%06d,%ld.%02d,%s,%d,%d,%d,%d\r\n",
+            sprintf(csv_line, "%ld,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%03d,%ld.%02d,%ld.%02d,%ld.%02d,%ld.%06d,%ld.%06d,%ld.%02d,%s,%d,%d,%d,%d\r\n",
                    flight_data.timestamp,
                    (int32_t)(flight_data.acceleration_x), abs((int32_t)(flight_data.acceleration_x * 1000) % 1000),
                    (int32_t)(flight_data.acceleration_y), abs((int32_t)(flight_data.acceleration_y * 1000) % 1000),
@@ -1126,7 +1199,6 @@ bool RocketStateMachine_TransferDataToSD_Recovery(RocketStateMachine_t* rocket, 
                    (int32_t)(flight_data.pressure), abs((int32_t)(flight_data.pressure * 100) % 100),
                    (int32_t)(flight_data.temperature), abs((int32_t)(flight_data.temperature * 100) % 100),
                    (int32_t)(flight_data.altitude), abs((int32_t)(flight_data.altitude * 100) % 100),
-                   (int32_t)(flight_data.vertical_velocity), abs((int32_t)(flight_data.vertical_velocity * 1000) % 1000),
                    (int32_t)(flight_data.latitude), abs((int32_t)(flight_data.latitude * 1000000) % 1000000),
                    (int32_t)(flight_data.longitude), abs((int32_t)(flight_data.longitude * 1000000) % 1000000),
                    (int32_t)(flight_data.gps_altitude), abs((int32_t)(flight_data.gps_altitude * 100) % 100),
@@ -1233,7 +1305,7 @@ bool RocketStateMachine_CheckAndRecoverFlashData_EarlyInit(SPIFlash_t* spiflash)
             return false;
         }
 
-        char header[] = "Timestamp,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ,Pressure,Temperature,Altitude,VerticalVelocity,Latitude,Longitude,GPS_Alt,Pyro0,Pyro1,Pyro2,Pyro3";
+        char header[] = "Timestamp,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ,Pressure,Temperature,Altitude,Latitude,Longitude,GPS_Alt,Pyro0,Pyro1,Pyro2,Pyro3";
 
         char csv_data[20000];
         csv_data[0] = '\0';
@@ -1418,7 +1490,7 @@ bool RocketStateMachine_CheckAndRecoverFlashData(RocketStateMachine_t* rocket) {
 bool RocketStateMachine_EraseFlashData(RocketStateMachine_t* rocket) {
     if (!rocket || !rocket->spi_flash) return false;
 
-    SDLogger_WriteText(&sdlogger, "Borrando sector de datos del Flash...");
+    SDLogger_WriteText(&sdlogger, "Borrando sectores de datos del Flash...");
 
     // Borrar los primeros sectores donde se guardan los datos
     uint32_t sectors_to_erase = ((rocket->total_data_points * sizeof(FlightData_t)) / 4096) + 1;
@@ -1464,7 +1536,9 @@ void RocketStateMachine_LoadDefaultConfig(RocketStateMachine_t* rocket) {
     rocket->config.simulation_mode_enabled = DEFAULT_SIMULATION_MODE_ENABLED;
 
     // Sensor configuration
-    rocket->config.accelerometer_range = DEFAULT_ACCELEROMETER_RANGE;
+    rocket->config.accelerometer_range      = DEFAULT_ACCELEROMETER_RANGE;
+    rocket->config.barometer_osr            = DEFAULT_BAROMETER_OSR;
+    rocket->config.flash_preinit_duration_s = DEFAULT_FLASH_PREINIT_DURATION_S;
 
     // Sensor safety
     rocket->config.sensor_timeout_ms = DEFAULT_SENSOR_TIMEOUT_MS;
@@ -1484,13 +1558,11 @@ void RocketStateMachine_LoadDefaultConfig(RocketStateMachine_t* rocket) {
     rocket->config.pyro_main_duration_ms = DEFAULT_PYRO_MAIN_DURATION_MS;
     rocket->config.main_deploy_altitude_agl = DEFAULT_MAIN_DEPLOY_ALTITUDE_AGL;
 
-    // Improved apogee detection
-    rocket->config.apogee_velocity_threshold = DEFAULT_APOGEE_VELOCITY_THRESHOLD;
+    // Apogee detection
     rocket->config.apogee_altitude_drop_threshold = DEFAULT_APOGEE_ALTITUDE_DROP_THRESHOLD;
 
     // Backup parachute deployment (safety)
     rocket->config.backup_activation_delay_ms = DEFAULT_BACKUP_ACTIVATION_DELAY_MS;
-    rocket->config.backup_velocity_threshold = DEFAULT_BACKUP_VELOCITY_THRESHOLD;
 
     SDLogger_WriteText(&sdlogger, "logs/config_loaded_defaults.txt");
 }
@@ -1599,6 +1671,18 @@ bool RocketStateMachine_LoadConfig(RocketStateMachine_t* rocket) {
                 rocket->config.accelerometer_range = (uint8_t)range;
             }
         }
+        else if (strncmp(line, "BAROMETER_OSR=", 14) == 0) {
+            int osr = atoi(line + 14);
+            if (osr >= 0 && osr <= 4) {
+                rocket->config.barometer_osr = (uint8_t)osr;
+            }
+        }
+        else if (strncmp(line, "FLASH_PREINIT_DURATION_S=", 25) == 0) {
+            int dur = atoi(line + 25);
+            if (dur > 0) {
+                rocket->config.flash_preinit_duration_s = (uint32_t)dur;
+            }
+        }
         // Sensor safety parameters
         else if (strncmp(line, "SENSOR_TIMEOUT_MS=", 18) == 0) {
             rocket->config.sensor_timeout_ms = atol(line + 18);
@@ -1642,19 +1726,13 @@ bool RocketStateMachine_LoadConfig(RocketStateMachine_t* rocket) {
         else if (strncmp(line, "MAIN_DEPLOY_ALTITUDE_AGL=", 25) == 0) {
             rocket->config.main_deploy_altitude_agl = atof(line + 25);
         }
-        // Improved apogee detection
-        else if (strncmp(line, "APOGEE_VELOCITY_THRESHOLD=", 26) == 0) {
-            rocket->config.apogee_velocity_threshold = atof(line + 26);
-        }
+        // Apogee detection
         else if (strncmp(line, "APOGEE_ALTITUDE_DROP_THRESHOLD=", 31) == 0) {
             rocket->config.apogee_altitude_drop_threshold = atof(line + 31);
         }
         // Backup parachute deployment (safety)
         else if (strncmp(line, "BACKUP_ACTIVATION_DELAY_MS=", 27) == 0) {
             rocket->config.backup_activation_delay_ms = atol(line + 27);
-        }
-        else if (strncmp(line, "BACKUP_VELOCITY_THRESHOLD=", 26) == 0) {
-            rocket->config.backup_velocity_threshold = atof(line + 26);
         }
     }
 
@@ -1678,11 +1756,9 @@ bool RocketStateMachine_LoadConfig(RocketStateMachine_t* rocket) {
     sprintf(pyro_msg, "Pyro Channels: %s", rocket->config.pyro_enable ? "ENABLED" : "DISABLED");
     SDLogger_WriteText(&sdlogger, pyro_msg);
 
-    char backup_msg[150];
-    sprintf(backup_msg, "Backup Parachute: Delay=%ldms, VelThreshold=%ld.%ldm/s",
-           rocket->config.backup_activation_delay_ms,
-           (int32_t)(rocket->config.backup_velocity_threshold),
-           abs((int32_t)(rocket->config.backup_velocity_threshold * 10) % 10));
+    char backup_msg[100];
+    sprintf(backup_msg, "Backup Parachute: Delay=%ldms (altitude-based detection)",
+           rocket->config.backup_activation_delay_ms);
     SDLogger_WriteText(&sdlogger, backup_msg);
 
     return true;

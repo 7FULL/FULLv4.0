@@ -24,6 +24,14 @@ typedef struct {
 
     // Sensor configuration
     uint8_t accelerometer_range;         // Accelerometer range (0=±8g, 1=±16g, 2=±32g, 3=±64g)
+    uint8_t barometer_osr;               // MS5611 OSR index (0=OSR256 … 4=OSR4096). Higher = more
+                                         // accurate but slower conversion. Conversion time is
+                                         // derived automatically via MS5611_GetConversionTime_ms().
+
+    // Flash pre-initialisation
+    uint32_t flash_preinit_duration_s;   // Maximum expected flight duration from ARMED to LANDED (s).
+                                         // Used to pre-erase exactly the needed flash sectors during
+                                         // the ARMED state so no erase happens mid-flight.
 
     // Sensor timeouts (safety)
     uint32_t sensor_timeout_ms;          // Max time without valid sensor read (default: 1000ms)
@@ -43,13 +51,11 @@ typedef struct {
     uint32_t pyro_main_duration_ms;      // Main firing duration (default: 3000ms)
     float main_deploy_altitude_agl;      // Main chute deploy altitude AGL (default: 300m)
 
-    // Improved apogee detection
-    float apogee_velocity_threshold;     // Vertical velocity threshold m/s (default: 2.0)
+    // Apogee detection
     float apogee_altitude_drop_threshold; // Altitude drop from max to detect apogee (default: 5.0m)
 
     // Backup parachute deployment (safety)
     uint32_t backup_activation_delay_ms;  // Time to wait after main deployment before checking (default: 5000ms)
-    float backup_velocity_threshold;      // Velocity threshold to trigger backup m/s (default: -10.0)
 } RocketConfig_t;
 
 typedef enum {
@@ -74,7 +80,6 @@ typedef struct {
     float pressure;
     float temperature;
     float altitude;
-    float vertical_velocity;       // Vertical velocity in m/s (calculated from altitude)
     float latitude;
     float longitude;
     float gps_altitude;
@@ -113,11 +118,6 @@ typedef struct {
     bool arming_conditions_met;          // All arming conditions satisfied
     uint32_t arming_stable_start_time;   // When altitude became stable
     float arming_reference_altitude;     // Altitude when arming started
-
-    // Velocity tracking for apogee detection
-    float vertical_velocity;             // Current vertical velocity (m/s)
-    float last_velocity_altitude;        // Last altitude used for velocity calc
-    uint32_t last_velocity_time;         // Last time velocity was calculated
 
     // Backup parachute deployment tracking
     bool main_chute_deployed;            // Main chute was deployed

@@ -36,11 +36,11 @@ class FlightDataAnalyzer:
         """Load and parse CSV flight data"""
         print(f"Loading flight data from: {self.csv_file.name}")
 
-        # CSV Format: Timestamp,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ,Pressure,Temperature,Altitude,VerticalVelocity,Latitude,Longitude,GPS_Alt,State,Pyro0,Pyro1,Pyro2,Pyro3
+        # CSV Format: Timestamp,AccelX,AccelY,AccelZ,GyroX,GyroY,GyroZ,Pressure,Temperature,Altitude,Latitude,Longitude,GPS_Alt,State,Pyro0,Pyro1,Pyro2,Pyro3
         column_names = [
             'Timestamp', 'AccelX', 'AccelY', 'AccelZ',
             'GyroX', 'GyroY', 'GyroZ',
-            'Pressure', 'Temperature', 'Altitude', 'VerticalVelocity',
+            'Pressure', 'Temperature', 'Altitude',
             'Latitude', 'Longitude', 'GPS_Alt',
             'State', 'Pyro0', 'Pyro1', 'Pyro2', 'Pyro3'
         ]
@@ -68,7 +68,7 @@ class FlightDataAnalyzer:
             numeric_columns = [
                 'Timestamp', 'AccelX', 'AccelY', 'AccelZ',
                 'GyroX', 'GyroY', 'GyroZ',
-                'Pressure', 'Temperature', 'Altitude', 'VerticalVelocity',
+                'Pressure', 'Temperature', 'Altitude',
                 'Latitude', 'Longitude', 'GPS_Alt',
                 'Pyro0', 'Pyro1', 'Pyro2', 'Pyro3'
             ]

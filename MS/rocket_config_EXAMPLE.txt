@@ -48,6 +48,29 @@ ACCELEROMETER_RANGE=0
 
 GPS_TIMEOUT_SECONDS=300
 
+# BAROMETER_OSR
+# Oversampling ratio for the MS5611 barometric pressure sensor.
+# Controls the trade-off between conversion speed and measurement noise.
+#
+# The flight computer derives the required conversion wait time automatically
+# from this value — you do not need to set any timing manually.
+#
+# Valid values:
+#   0 = OSR 256  — conversion:  0.6 ms  (fastest, ~±4 m altitude noise)
+#   1 = OSR 512  — conversion:  1.2 ms
+#   2 = OSR 1024 — conversion:  2.3 ms
+#   3 = OSR 2048 — conversion:  4.6 ms
+#   4 = OSR 4096 — conversion:  9.1 ms  (slowest, ~±0.8 m altitude noise)
+#
+# Recommendations:
+#   - Fast flight / short burn motor:   0 or 1 (higher barometer update rate)
+#   - Altitude-sensitive apogee detect: 2 or 3 (lower noise floor)
+#   - Maximum altitude accuracy:        4 (best noise, adds ~18 ms per full cycle)
+#
+# Default: 0
+
+BAROMETER_OSR=0
+
 #==============================================================================
 # FLIGHT DETECTION PARAMETERS
 #==============================================================================
@@ -116,7 +139,7 @@ BOOST_TIMEOUT_MS=10000
 #
 # How it works:
 #   - If coasting longer than this without detecting apogee, force APOGEE
-#   - Safety fallback if velocity and altitude-drop methods fail
+#   - Safety fallback if altitude-drop method fails
 #   - State transitions: COAST → APOGEE (emergency)
 #
 # Recommendations:
@@ -126,29 +149,10 @@ BOOST_TIMEOUT_MS=10000
 #
 # IMPORTANT:
 #   - This is a LAST RESORT safety mechanism
-#   - Primary detection: APOGEE_VELOCITY_THRESHOLD (velocity-based)
-#   - Secondary detection: APOGEE_ALTITUDE_DROP_THRESHOLD (altitude-based)
+#   - Primary detection: APOGEE_ALTITUDE_DROP_THRESHOLD (altitude-based)
 #   - Set longer than expected coast time to apogee
 
 COAST_TIMEOUT_MS=5000
-
-# APOGEE_VELOCITY_THRESHOLD
-# Vertical velocity threshold for apogee detection (m/s)
-#
-# Range: 0.5 to 5.0 m/s
-# Default: 2.0 m/s
-#
-# How it works:
-#   - If vertical velocity is NEGATIVE (descending) and magnitude exceeds this
-#   - Apogee is confirmed immediately without waiting for descent time
-#   - More accurate and faster than time-based detection
-#
-# Recommendations:
-#   - Small/slow rockets: 1.0 m/s
-#   - Mid-power rockets: 2.0 m/s
-#   - High-power rockets: 3.0 m/s
-
-APOGEE_VELOCITY_THRESHOLD=2.0
 
 # APOGEE_ALTITUDE_DROP_THRESHOLD
 # Altitude drop from maximum to detect apogee (meters)
@@ -157,7 +161,7 @@ APOGEE_VELOCITY_THRESHOLD=2.0
 # Default: 5.0 m
 #
 # How it works:
-#   - This is a FALLBACK method if velocity-based detection fails
+#   - This is the PRIMARY method for apogee detection
 #   - If altitude drops by this amount from max_altitude, apogee is confirmed
 #   - Used together with COAST_TIMEOUT_MS as safety backup
 #   - State transitions: COAST → APOGEE
@@ -171,7 +175,7 @@ APOGEE_VELOCITY_THRESHOLD=2.0
 # IMPORTANT:
 #   - Too small: false apogee from sensor noise or wind
 #   - Too large: delayed apogee detection, late drogue deployment
-#   - Primary detection is APOGEE_VELOCITY_THRESHOLD (more accurate)
+#   - Set conservatively - better slightly late than false trigger
 
 APOGEE_ALTITUDE_DROP_THRESHOLD=5.0
 
@@ -183,13 +187,19 @@ APOGEE_ALTITUDE_DROP_THRESHOLD=5.0
 # Maximum altitude variation to consider "stable" (meters)
 #
 # Range: 0.5 to 10.0 m
-# Default: 2.0 m
+# Default: 5.0 m
 #
 # How it works:
-#   - If altitude changes less than this value, it's considered stable
+#   - If altitude stays within this range from reference, it's considered stable
 #   - Used for both arming and landing detection
+#   - MS5611 barometer has ~1-2m noise, so 5m allows for safe detection
+#
+# Recommendations:
+#   - Indoor testing / calm conditions: 3.0 m
+#   - Outdoor / windy conditions: 5.0 m
+#   - Very windy conditions: 7.0 m
 
-ALTITUDE_STABLE_THRESHOLD=2.0
+ALTITUDE_STABLE_THRESHOLD=5.0
 
 # STABLE_TIME_LANDING_MS
 # Time with stable altitude to confirm landing (milliseconds)
@@ -390,34 +400,6 @@ MAIN_DEPLOY_ALTITUDE_AGL=300
 
 BACKUP_ACTIVATION_DELAY_MS=5000
 
-# BACKUP_VELOCITY_THRESHOLD
-# Vertical velocity threshold to trigger backup parachute (m/s, negative = descending)
-#
-# Range: -50.0 to -5.0 m/s
-# Default: -10.0 m/s (descending faster than 10 m/s)
-#
-# How it works:
-#   - After BACKUP_ACTIVATION_DELAY_MS, check vertical velocity
-#   - If velocity is MORE NEGATIVE than this threshold, backup activates
-#   - Example: -10.0 means "if descending faster than 10 m/s"
-#   - Protects against main chute failure (tangled, damaged, etc.)
-#   - State: PARACHUTE (backup activation safety check)
-#
-# Recommendations:
-#   - Conservative (activates easily): -8.0 m/s
-#   - Balanced (recommended): -10.0 m/s
-#   - Aggressive (only severe failures): -15.0 m/s
-#
-# IMPORTANT:
-#   - Must be NEGATIVE (descending velocity)
-#   - Too small magnitude (-5): may trigger on normal main descent
-#   - Too large magnitude (-20): won't trigger until very high speed
-#   - Consider expected descent rate with working main chute
-#   - Typical main chute descent: 5-8 m/s
-#   - Typical drogue-only descent: 15-25 m/s
-
-BACKUP_VELOCITY_THRESHOLD=-10.0
-
 #==============================================================================
 # DATA LOGGING PARAMETERS
 #==============================================================================
@@ -443,6 +425,35 @@ BACKUP_VELOCITY_THRESHOLD=-10.0
 #   - Low-memory mode: 50 ms (20 Hz)
 
 DATA_LOGGING_FREQ_MS=5
+
+# FLASH_PREINIT_DURATION_S
+# Maximum expected flight duration from ARMED state to LANDED, in seconds.
+#
+# Before launch the flight computer pre-erases exactly the number of flash
+# sectors needed for this duration at the configured logging frequency.
+# This eliminates all mid-flight sector erase operations (which can block
+# the loop for 100-400 ms and cause gaps in flight data).
+#
+# The sector count is calculated automatically:
+#   sectors = ceil( (duration_s * 1000 / DATA_LOGGING_FREQ_MS) *
+#                   sizeof(FlightData) / 4096 )
+#
+# Pre-erase happens during the ARMED state (rocket on the pad, before launch)
+# so the blocking time does not affect flight data quality.
+#
+# Range: 30 to 1800 s
+# Default: 300 s (5 minutes) — conservative for any small/mid-power rocket
+#
+# Recommendations:
+#   - Small rockets (< 30 s flight): 60 s
+#   - Typical sport rocket:         300 s (5 min)
+#   - High-power long flight:       600 s (10 min)
+#
+# IMPORTANT: Set this LONGER than your actual expected flight time.
+#   Too short → flash runs out of pre-erased space → erase resumes mid-flight.
+#   Too long  → longer wait on pad during arming (harmless, but visible).
+
+FLASH_PREINIT_DURATION_S=300
 
 #==============================================================================
 # SIMULATION MODE (TESTING ONLY)

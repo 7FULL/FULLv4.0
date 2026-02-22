@@ -14,7 +14,13 @@ bool MS5611_Init(MS5611_t* ms5611, SPI_HandleTypeDef *hspi, GPIO_TypeDef *cs_por
     ms5611->cs_gpio_port = cs_port;
     ms5611->cs_pin = cs_pin;
     ms5611->is_initialized = false;
-    ms5611->osr = 2; // OSR=1024 (optimizado para velocidad - ~166Hz, ±0.23m precisión)
+    ms5611->osr = 0; // OSR=256 (0.6 ms conversion) — caller can change via MS5611_SetOSR
+
+    // Non-blocking state machine initialisation
+    ms5611->conv_state        = MS5611_CONV_IDLE;
+    ms5611->conv_start_time_ms = 0;
+    ms5611->raw_D1            = 0;
+    ms5611->raw_D2            = 0;
 
     // Configurar CS como HIGH (inactivo)
     HAL_GPIO_WritePin(ms5611->cs_gpio_port, ms5611->cs_pin, GPIO_PIN_SET);
@@ -101,17 +107,6 @@ bool MS5611_IsValidPROM(MS5611_t* ms5611) {
     return true;
 }
 
-bool MS5611_IsReady(MS5611_t* ms5611) {
-    if (!ms5611) return false;
-
-    // Read ADC to check if conversion is complete
-    // If ADC returns 0, conversion is not ready
-    // Note: This is a simplified check. A more robust implementation
-    // would read a status register if available
-    uint32_t adc = MS5611_ReadADC(ms5611);
-    return (adc != 0);
-}
-
 bool MS5611_SetOSR(MS5611_t* ms5611, uint8_t osr) {
     if (!ms5611 || !ms5611->is_initialized) return false;
 
@@ -153,24 +148,23 @@ uint32_t MS5611_ReadRawPressure(MS5611_t* ms5611) {
     // Iniciar conversión
     MS5611_SendCommand(ms5611, cmd);
 
-    // Polling rápido del bit BUSY en vez de delay fijo
-    // Timeout según OSR (máximo teórico + margen)
-    uint16_t timeout_ms;
+    // Esperar tiempo mínimo de conversión según OSR
+    // No podemos hacer polling porque el MS5611 no tiene registro de estado
+    uint32_t delay_us;
     switch(ms5611->osr) {
-        case 0: timeout_ms = 2; break;    // OSR=256 (max 0.6ms)
-        case 1: timeout_ms = 3; break;    // OSR=512 (max 1.2ms)
-        case 2: timeout_ms = 4; break;    // OSR=1024 (max 2.3ms)
-        case 3: timeout_ms = 6; break;    // OSR=2048 (max 4.6ms)
-        case 4: timeout_ms = 12; break;   // OSR=4096 (max 9.1ms)
-        default: timeout_ms = 12; break;
+        case 0: delay_us = 600; break;    // OSR=256 (max 0.6ms)
+        case 1: delay_us = 1200; break;   // OSR=512 (max 1.2ms)
+        case 2: delay_us = 2300; break;   // OSR=1024 (max 2.3ms)
+        case 3: delay_us = 4600; break;   // OSR=2048 (max 4.6ms)
+        case 4: delay_us = 9100; break;   // OSR=4096 (max 9.1ms)
+        default: delay_us = 2300; break;
     }
 
-    // Poll conversion complete (típicamente termina antes del máximo)
+    // Use busy-wait for microsecond precision (HAL_Delay is 1ms resolution)
     uint32_t start = HAL_GetTick();
-    while ((HAL_GetTick() - start) < timeout_ms) {
-        if (MS5611_IsReady(ms5611)) {
-            break;
-        }
+    uint32_t delay_ms = (delay_us + 999) / 1000;  // Round up to milliseconds
+    while ((HAL_GetTick() - start) < delay_ms) {
+        // Busy wait
     }
 
     // Leer resultado
@@ -185,23 +179,23 @@ uint32_t MS5611_ReadRawTemperature(MS5611_t* ms5611) {
     // Iniciar conversión
     MS5611_SendCommand(ms5611, cmd);
 
-    // Polling rápido del bit BUSY en vez de delay fijo
-    uint16_t timeout_ms;
+    // Esperar tiempo mínimo de conversión según OSR
+    // No podemos hacer polling porque el MS5611 no tiene registro de estado
+    uint32_t delay_us;
     switch(ms5611->osr) {
-        case 0: timeout_ms = 2; break;    // OSR=256 (max 0.6ms)
-        case 1: timeout_ms = 3; break;    // OSR=512 (max 1.2ms)
-        case 2: timeout_ms = 4; break;    // OSR=1024 (max 2.3ms)
-        case 3: timeout_ms = 6; break;    // OSR=2048 (max 4.6ms)
-        case 4: timeout_ms = 12; break;   // OSR=4096 (max 9.1ms)
-        default: timeout_ms = 12; break;
+        case 0: delay_us = 600; break;    // OSR=256 (max 0.6ms)
+        case 1: delay_us = 1200; break;   // OSR=512 (max 1.2ms)
+        case 2: delay_us = 2300; break;   // OSR=1024 (max 2.3ms)
+        case 3: delay_us = 4600; break;   // OSR=2048 (max 4.6ms)
+        case 4: delay_us = 9100; break;   // OSR=4096 (max 9.1ms)
+        default: delay_us = 2300; break;
     }
 
-    // Poll conversion complete
+    // Use busy-wait for microsecond precision (HAL_Delay is 1ms resolution)
     uint32_t start = HAL_GetTick();
-    while ((HAL_GetTick() - start) < timeout_ms) {
-        if (MS5611_IsReady(ms5611)) {
-            break;
-        }
+    uint32_t delay_ms = (delay_us + 999) / 1000;  // Round up to milliseconds
+    while ((HAL_GetTick() - start) < delay_ms) {
+        // Busy wait
     }
 
     // Leer resultado
@@ -249,29 +243,88 @@ float MS5611_CalculatePressure(MS5611_t* ms5611, uint32_t D1, uint32_t D2) {
     return P / 100.0f; // Convertir a mbar
 }
 
-int32_t MS5611_CalculateAltitude(float pressure) {
-    // Fórmula barométrica usando presión estándar al nivel del mar (1013.25 mbar)
+float MS5611_CalculateAltitude(float pressure) {
+    // Barometric formula using standard sea-level pressure (1013.25 mbar)
     const float sea_level_pressure = 1013.25f;
 
-    if (pressure <= 0) return 0;
+    if (pressure <= 0.0f) return 0.0f;
 
-    float altitude = 44330.0f * (1.0f - powf(pressure / sea_level_pressure, 1.0f / 5.255f));
-    return (int32_t)altitude;
+    return 44330.0f * (1.0f - powf(pressure / sea_level_pressure, 1.0f / 5.255f));
 }
 
+// Returns the minimum conversion wait time in milliseconds for the given OSR index.
+// Values are taken from the MS5611 datasheet max conversion times, rounded up to
+// the next whole millisecond so HAL_GetTick() (1 ms resolution) is sufficient.
+uint32_t MS5611_GetConversionTime_ms(uint8_t osr) {
+    switch (osr) {
+        case 0: return  1;  // OSR=256  : 0.60 ms max
+        case 1: return  2;  // OSR=512  : 1.17 ms max
+        case 2: return  3;  // OSR=1024 : 2.28 ms max
+        case 3: return  5;  // OSR=2048 : 4.54 ms max
+        case 4: return 10;  // OSR=4096 : 9.04 ms max
+        default: return 3;
+    }
+}
+
+// Non-blocking state machine.
+// Call every loop iteration; returns true and fills *data only when a full
+// pressure + temperature sample has been computed.
+bool MS5611_Update(MS5611_t* ms5611, MS5611_Data_t* data) {
+    if (!ms5611 || !ms5611->is_initialized || !data) return false;
+
+    uint32_t now          = HAL_GetTick();
+    uint32_t conv_time_ms = MS5611_GetConversionTime_ms(ms5611->osr);
+    uint8_t  d1_cmd       = MS5611_CMD_CONVERT_D1_OSR256 + (ms5611->osr * 2);
+    uint8_t  d2_cmd       = MS5611_CMD_CONVERT_D2_OSR256 + (ms5611->osr * 2);
+
+    switch (ms5611->conv_state) {
+
+        case MS5611_CONV_IDLE:
+            // Start pressure (D1) conversion
+            MS5611_SendCommand(ms5611, d1_cmd);
+            ms5611->conv_start_time_ms = now;
+            ms5611->conv_state = MS5611_CONV_D1;
+            return false;
+
+        case MS5611_CONV_D1:
+            if ((now - ms5611->conv_start_time_ms) < conv_time_ms) return false;
+            // D1 ready — read it, then kick off temperature (D2) conversion
+            ms5611->raw_D1 = MS5611_ReadADC(ms5611);
+            MS5611_SendCommand(ms5611, d2_cmd);
+            ms5611->conv_start_time_ms = now;
+            ms5611->conv_state = MS5611_CONV_D2;
+            return false;
+
+        case MS5611_CONV_D2:
+            if ((now - ms5611->conv_start_time_ms) < conv_time_ms) return false;
+            // D2 ready — read it and compute compensated values
+            ms5611->raw_D2 = MS5611_ReadADC(ms5611);
+            ms5611->conv_state = MS5611_CONV_IDLE;
+
+            if (ms5611->raw_D1 == 0 || ms5611->raw_D2 == 0) return false;
+
+            data->temperature = MS5611_CalculateTemperature(ms5611, ms5611->raw_D2);
+            data->pressure    = MS5611_CalculatePressure(ms5611, ms5611->raw_D1, ms5611->raw_D2);
+            data->altitude    = MS5611_CalculateAltitude(data->pressure);
+            return true;
+    }
+
+    return false;
+}
+
+// Blocking one-shot read — for use during initialisation ONLY.
+// In the flight loop always use MS5611_Update() instead.
 bool MS5611_ReadData(MS5611_t* ms5611, MS5611_Data_t *data) {
     if (!ms5611 || !ms5611->is_initialized || !data) return false;
 
-    // Leer datos raw
     uint32_t D1 = MS5611_ReadRawPressure(ms5611);
     uint32_t D2 = MS5611_ReadRawTemperature(ms5611);
 
     if (D1 == 0 || D2 == 0) return false;
 
-    // Calcular valores compensados
     data->temperature = MS5611_CalculateTemperature(ms5611, D2);
-    data->pressure = MS5611_CalculatePressure(ms5611, D1, D2);
-    data->altitude = MS5611_CalculateAltitude(data->pressure);
+    data->pressure    = MS5611_CalculatePressure(ms5611, D1, D2);
+    data->altitude    = MS5611_CalculateAltitude(data->pressure);
 
     return true;
 }
